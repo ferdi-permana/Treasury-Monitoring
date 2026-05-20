@@ -295,14 +295,14 @@
     }
 
     .book-grid {
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
       gap: 20px;
       margin-top: 16px;
     }
 
     .exchange-card {
       overflow: hidden;
-      min-width: 340px;
+      min-width: 360px;
     }
 
     .exchange-head {
@@ -355,7 +355,7 @@
 
     .exchange-card th,
     .exchange-card td {
-      padding: 9px 12px;
+      padding: 10px 12px;
     }
 
     .book-side {
@@ -691,12 +691,12 @@
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
 
-        // Perhitungan akurat total volume nominal IDR dari masing-masing 10 baris data
+        // 1. Kalkulasi Akurat Total Volume Nominal IDR dari data dasar asli API (Top 10)
         const totalBidVolIdr = (data?.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
         const totalAskVolIdr = (data?.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
-        // Fungsi pembantu lokal untuk mengubah angka menjadi format ringkas (jt / M) tanpa tulisan Rp
-        const ringkasAngka = (num) => {
+        // Fungsi lokal untuk menyederhanakan nominal besar menjadi format teks Indonesia (jt / M) tanpa 'Rp'
+        const formatVolAtas = (num) => {
           if (!num || isNaN(num)) return "-";
           if (num >= 1e9) {
             return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 2 }) + " M";
@@ -707,13 +707,14 @@
           return num.toLocaleString("id-ID");
         };
 
-        // Menampilkan akumulasi volume dalam format Rupiah bersih
-        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? fmtIdr(totalBidVolIdr) : "-");
-        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? fmtIdr(totalAskVolIdr) : "-");
+        // Memasukkan hasil ringkasan volume ke komponen bagian atas kartu
+        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? formatVolAtas(totalBidVolIdr) : "-");
+        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? formatVolAtas(totalAskVolIdr) : "-");
         
-        // Menampilkan nominal rupiah selisih harga (Spread) saja tanpa satuan persen/bps
+        // Menampilkan nominal rupiah selisih harga (Spread) dengan lambang Rp utuh
         setText(`${config.key}-spread`, data?.spread != null ? fmtIdr(data.spread) : "-");
         
+        // Memrender isi baris data ke dalam tabel
         setBookRows(`${config.key}-bids`, data?.bids || [], "bid");
         setBookRows(`${config.key}-asks`, data?.asks || [], "ask");
       });
@@ -1011,14 +1012,13 @@
       const displayLevels = side === "ask" ? [...levels].reverse() : levels;
       
       tbody.innerHTML = displayLevels.map((level, index) => {
-        // 2. PERBAIKAN FORMULA IDR VOL BARIS:
-        // Menghitung murni Volume IDR baris ini secara riil tanpa akumulasi kumulatif (Harga x Qty USDT)
+        // 2. PERBAIKAN FORMULA: Menghitung murni Volume IDR baris ini (Harga x Volume USDT) tanpa akumulasi kumulatif
         const realRowIdrVol = level.price * level.qty;
         
-        // Memformat angka menjadi string desimal penuh dengan tanda pemisah ribuan titik (Tanpa pembulatan jt/M)
+        // Memformat angka menjadi string desimal penuh dengan pemisah ribuan titik (Tanpa pembulatan jt/M)
         const formatIdrTabel = Math.round(realRowIdrVol).toLocaleString("id-ID");
 
-        // Logika penomoran baris terbalik (10 down to 1) untuk Order Jual, dan normal (1 up to 10) untuk Order Beli
+        // Logika penomoran baris terbalik (10 ke 1) untuk Order Jual, dan normal (1 ke 10) untuk Order Beli
         const rowNumber = side === "ask" ? (10 - index) : (index + 1);
         
         // Bersihkan teks 'Rp' pada harga level agar kolom tabel tetap rapi
