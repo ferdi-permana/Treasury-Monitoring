@@ -689,20 +689,20 @@
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
 
-        // Hitung total volume nominal IDR dari 10 baris bids (beli)
+        // Perhitungan akurat total volume nominal IDR dari masing-masing 10 baris data
         const totalBidVolIdr = (data?.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        // Hitung total volume nominal IDR dari 10 baris asks (jual)
         const totalAskVolIdr = (data?.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
-        // Tampilkan total volume dengan format ringkas mata uang (contoh: Rp150M atau Rp2,5M) agar pas di kotak
+        // Menampilkan akumulasi volume dalam format Rupiah bersih
         setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? fmtIdr(totalBidVolIdr) : "-");
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? fmtIdr(totalAskVolIdr) : "-");
         
-        // Hanya menampilkan nominal rupiah spread saja (menghapus format persen/bps)
+        // Menampilkan nominal rupiah selisih harga (Spread) saja tanpa satuan persen/bps
         setText(`${config.key}-spread`, data?.spread != null ? fmtIdr(data.spread) : "-");
         
         setBookRows(`${config.key}-bids`, data?.bids || [], "bid");
-        setBookRows(`${config.key}-asks`, data rhythms || data?.asks || [], "ask");
+        // PERBAIKAN: Menghapus teks typo 'rhythms' yang memicu kegagalan sistem
+        setBookRows(`${config.key}-asks`, data?.asks || [], "ask");
       });
     }
 
@@ -996,16 +996,17 @@
 
       let cumulative = 0;
       const displayLevels = side === "ask" ? [...levels].reverse() : levels;
+      
       tbody.innerHTML = displayLevels.map((level, index) => {
         cumulative += level.price * level.qty;
 
-        // Penomoran baris: Jika "ask" (Order Jual), baris pertama (index 0) akan bernilai 10, lalu 9, dst.
-        // Jika "bid" (Order Beli), urutan tetap normal 1 sampai 10.
+        // Logika penomoran baris: Jika "ask" (Order Jual), baris paling atas (index 0) diisi nomor 10, menurun hingga 1.
+        // Jika "bid" (Order Beli), urutan normal terhitung dari angka 1 sampai 10.
         const rowNumber = side === "ask" ? (10 - index) : (index + 1);
         
         return `
           <tr>
-            <td>${index + 1}</td>
+            <td>${rowNumber}</td>
             <td>${fmtIdr(level.price)}</td>
             <td>${fmtNumber(level.qty)}</td>
             <td>${fmtCompact(cumulative)}</td>
@@ -1013,7 +1014,7 @@
         `;
       }).join("");
     }
-
+    
     function getSourceStatus(source) {
       if (!source) return { kind: "delayed", text: "Waiting" };
       if (source.error) return { kind: "error", text: "No data" };
