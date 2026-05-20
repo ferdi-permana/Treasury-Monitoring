@@ -750,7 +750,8 @@
       const asks = normalizeRekuSide(rawAsks, "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Struktur array orderbook Reku tidak dikenali.");
+        console.error("DEBUG REKU: Struktur data tidak dikenali. Ini isi respons aslinya:", book);
+        throw new Error("Format data API Reku berubah atau tidak dikenali.");
       }
 
       return finalizeBook({
@@ -907,26 +908,27 @@
       }
     }
 
-    function normalizeRekuSide(levels, side) {
+   function normalizeRekuSide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
           let price = 0;
           let qty = 0;
 
-          // JIKA FORMATNYA OBJECT: { price: "...", volume: "..." } -> Format API v2 Publik
+          // 1. JIKA FORMATNYA OBJECT (Format Standar API v2 Reku)
           if (level && typeof level === "object" && !Array.isArray(level)) {
+            // Cek properti .price / .p dan .volume / .qty / .v
             price = Number(level.price || level.p || 0);
             qty = Number(level.volume || level.qty || level.v || 0);
           } 
-          // JIKA FORMATNYA ARRAY: [notional, price, qty] atau [price, qty] -> Format Alternatif/Lama
+          // 2. JIKA FORMATNYA ARRAY (Format Cadangan/Bursa Lain)
           else if (Array.isArray(level)) {
             if (level.length === 3) {
-              // Jika [notional, price, qty] seperti asumsi kode awal Anda
+              // Format [notional, price, qty] seperti asumsi kode awal Anda
               price = Number(level[1] || 0);
               qty = Number(level[2] || 0);
-            } else {
-              // Jika [price, qty] standar array exchange umum
+            } else if (level.length === 2) {
+              // Format [price, qty] standar industri crypto
               price = Number(level[0] || 0);
               qty = Number(level[1] || 0);
             }
@@ -940,8 +942,8 @@
             side
           };
         })
-        // VALIDASI KETAT: Buang data jika nilainya salah, NaN, atau di bawah/sama dengan 0
-        .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
+        // Filter super aman: Hanya meloloskan angka asli (bukan NaN) dan di atas angka 0
+        .filter((level) => !isNaN(level.price) && !isNaN(level.qty) && level.price > 0 && level.qty > 0);
     }
     
     function normalizePriceQtySide(levels, side) {
