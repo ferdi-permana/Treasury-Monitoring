@@ -572,7 +572,7 @@
           <div class="exchange-stats">
             <div class="stat"><span class="small">Total Vol. Jual (IDR)</span><strong id="${config.key}-total-ask-vol">-</strong></div>
             <div class="stat"><span class="small">Total Vol. Beli (IDR)</span><strong id="${config.key}-total-bid-vol">-</strong></div>
-            <div class="stat"><span class="small">Selisih (Spread)</span><strong id="${config.key}-spread">-</strong></div>
+            <div class="stat"><span class="small">Selisih</span><strong id="${config.key}-spread">-</strong></div>
           </div>
           <div class="book-tables">
             <div class="book-side">
@@ -693,6 +693,18 @@
         const totalBidVolIdr = (data?.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
         const totalAskVolIdr = (data?.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
+        // Fungsi pembantu lokal untuk mengubah angka menjadi format ringkas (jt / M) tanpa tulisan Rp
+        const ringkasAngka = (num) => {
+          if (!num || isNaN(num)) return "-";
+          if (num >= 1e9) {
+            return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 2 }) + " M";
+          }
+          if (num >= 1e6) {
+            return (num / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt";
+          }
+          return num.toLocaleString("id-ID");
+        };
+
         // Menampilkan akumulasi volume dalam format Rupiah bersih
         setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? fmtIdr(totalBidVolIdr) : "-");
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? fmtIdr(totalAskVolIdr) : "-");
@@ -701,7 +713,6 @@
         setText(`${config.key}-spread`, data?.spread != null ? fmtIdr(data.spread) : "-");
         
         setBookRows(`${config.key}-bids`, data?.bids || [], "bid");
-        // PERBAIKAN: Menghapus teks typo 'rhythms' yang memicu kegagalan sistem
         setBookRows(`${config.key}-asks`, data?.asks || [], "ask");
       });
     }
