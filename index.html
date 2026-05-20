@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>USDT/IDR Treasury Market Monitor</title>
-  <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=YOyy82_pUSQA7Jp5P-EOCs-LAGnvNub8fK1b3nHax7YrP2esBXGEOH6zJAmcQzxHp7BQZX_pFM6GsWVtTOR45LN6Ml2QIxWwy9XN1Ze6Rq2FZ1Y8oldMWT0pRBnRMiw4BqsC7t91mPP8Yl-Q_JfmFuyOIehca31CG7n6Fdw3TYHWWuMBK1-_EY6j6Eqe8Ej7hxhYIkgex3O5VrMXtw_Y704M54lQswg_1t7Vxl6M4OW389zh_2WC4LTuieYs5vZrYjy3-7iJq8zi7OM_3zgfnoGoKFO8H-r2skSIUOrwqih8cng8z_c9Et-VOkBYLjX4" charset="UTF-8"></script><link rel="stylesheet" crossorigin="anonymous" href="https://gc.kis.v2.scr.kaspersky-labs.com/E3E8934C-235A-4B0E-825A-35A08381A191/abn/main.css?attr=aHR0cHM6Ly9jb250cmlidXRpb24udXNlcmNvbnRlbnQuZ29vZ2xlLmNvbS9kb3dubG9hZD9jPUNneGlZWEprWDNOMGIzSmhaMlVTVEJJSmRHVnRjRjlrWVhSaEdqOEtNR00wTnpjM05EaGtZMlF3T1RZMVpXSXdNREEyTlRJelpHRmtNakJqT1dVeU1EWTJZelJtT1dRek5URXhNVGxoTWhJTEVnY1FzdXVjMF9vTUdBRSZmaWxlbmFtZT1pbmRleC5odG1sJm9waT0xMDMxMzUwNTA"/><style>
+  <style>
     :root {
       --bg: #f5f7f9;
       --surface: #ffffff;
@@ -663,6 +663,7 @@
         })()
       ]);
 
+      void results;
       state.inFlight = false;
       els.refreshButton.disabled = false;
       state.countdown = REFRESH_SECONDS;
@@ -739,10 +740,9 @@
     }
 
     async function fetchReku() {
-      // Menggunakan kombinasi endpoint ID 20 (USDT-IDR resmi Reku)
       const book = await fetchJson("https://api.reku.id/v2/orderbook?id=20");
       
-      // Deteksi validitas response API Reku Pro v2
+      // Amankan properti data root jika Reku berganti nama field (bids/asks atau b/s)
       const rawBids = book.bids || book.buy || book.b || [];
       const rawAsks = book.asks || book.sell || book.s || [];
       
@@ -750,7 +750,7 @@
       const asks = normalizeRekuSide(rawAsks, "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Struktur response API Reku kosong atau tidak valid.");
+        throw new Error("Skema API Reku kosong atau tidak valid.");
       }
 
       return finalizeBook({
@@ -759,7 +759,7 @@
         asks,
         fetchedAt: new Date(),
         sourceUpdatedAt: null,
-        sourceUpdatedAtText: "API Reku Pro Live",
+        sourceUpdatedAtText: "API Reku Pro tidak menyertakan timestamp order book",
         note: "Reku Pro symbol: USDT_IDR"
       });
     }
@@ -767,7 +767,7 @@
     async function fetchTokocrypto() {
       const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=10";
       const payload = await fetchJson(url);
-      if (payload.code !== 0 && payload.code !== undefined) throw new Error(payload.msg || "Tokocrypto error.");
+      if (payload.code !== 0 && payload.code !== undefined) throw new Error(payload.msg || "Tokocrypto mengembalikan status non-success.");
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
@@ -777,7 +777,7 @@
         asks,
         fetchedAt: new Date(),
         sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null,
-        sourceUpdatedAtText: payload.timestamp ? null : "No timestamp",
+        sourceUpdatedAtText: payload.timestamp ? null : "API Tokocrypto tidak menyertakan timestamp valid",
         note: `lastUpdateId: ${data.lastUpdateId || "-"}`
       });
     }
@@ -796,7 +796,7 @@
           "https://indodax.com/api/ticker/usdtidr",
           "https://indodax.com/api/ticker/usdt_idr"
         ]);
-      } catch (e) {
+      } catch (error) {
         ticker = null;
       }
 
@@ -807,8 +807,8 @@
         asks,
         fetchedAt: new Date(),
         sourceUpdatedAt: serverTime ? new Date(serverTime * 1000) : null,
-        sourceUpdatedAtText: serverTime ? null : "No timestamp",
-        note: ticker ? "Ticker OK" : "No ticker time"
+        sourceUpdatedAtText: serverTime ? null : "Depth Indodax tidak menyertakan timestamp",
+        note: ticker ? "Ticker server_time berhasil dibaca" : "Ticker server_time tidak tersedia"
       });
     }
 
@@ -816,10 +816,11 @@
       const endpoints = [
         "https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR&depth=10",
         "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR&depth=10",
-        "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDRT&depth=10"
+        "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDRT&depth=10",
+        "https://api.uat.pintupro.com/v1/public/get-book?symbol=USDT-IDR&depth=10"
       ];
       const payload = await fetchJsonWithCandidates(endpoints);
-      if (payload.code !== 0 && payload.code !== undefined) throw new Error(payload.reason || "Pintu error.");
+      if (payload.code !== 0 && payload.code !== undefined) throw new Error(payload.reason || payload.message || "Pintu Pro mengembalikan status non-success.");
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
@@ -829,7 +830,7 @@
         asks,
         fetchedAt: new Date(),
         sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null,
-        sourceUpdatedAtText: payload.timestamp ? null : "No timestamp",
+        sourceUpdatedAtText: payload.timestamp ? null : "API Pintu Pro tidak menyertakan timestamp valid",
         note: `Symbol: ${data.symbol || "USDT-IDR"}`
       });
     }
@@ -860,13 +861,13 @@
 
     async function fetchJson(url) {
       const response = await fetchRemote(url, "application/json");
-      if (!response.ok) throw new Error(`${response.status} dari ${new URL(url).hostname}`);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText} dari ${new URL(url).hostname}`);
       return response.json();
     }
 
     async function fetchText(url) {
       const response = await fetchRemote(url, "text/html,application/xhtml+xml");
-      if (!response.ok) throw new Error(`${response.status} dari ${new URL(url).hostname}`);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText} dari ${new URL(url).hostname}`);
       return response.text();
     }
 
@@ -910,37 +911,49 @@
       if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
-          // Robust parsing untuk struktur array Reku [bid_total, price, quantity] atau object/string
-          let p = 0, q = 0, n = 0;
+          let price = 0, qty = 0, notional = 0;
+
+          // JIKA REKU MENGEMBALIKAN FORMAT ARRAY BISA ISI 3 ATAU ISI 2
           if (Array.isArray(level)) {
-            p = Number(level[1]); // Price biasanya di indeks 1 pada API v2 orderbook
-            q = Number(level[2]); // Quantity di indeks 2
-            n = Number(level[0]); // Notional di indeks 0
-            
-            // Defensif jika struktur terbalik atau berbeda
-            if (p === 0 || isNaN(p)) {
-              p = Number(level[0]);
-              q = Number(level[1]);
-              n = p * q;
+            if (level.length >= 3) {
+              // Skema standar Reku v2: [notional, price, qty]
+              price = Number(level[1]);
+              qty = Number(level[2]);
+              notional = Number(level[0]);
+
+              // Fallback proteksi: jika indeks tertukar [price, qty, notional]
+              if (isNaN(price) || price <= 0 || price < 100) {
+                price = Number(level[0]);
+                qty = Number(level[1]);
+                notional = price * qty;
+              }
+            } else if (level.length === 2) {
+              // Skema cadangan umum: [price, qty]
+              price = Number(level[0]);
+              qty = Number(level[1]);
+              notional = price * qty;
             }
-          } else if (level && typeof level === 'object') {
-            p = Number(level.price || level.p || 0);
-            q = Number(level.qty || level.quantity || level.q || 0);
-            n = Number(level.notional || level.n || (p * q));
+          } 
+          // JIKA REKU MENGEMBALIKAN FORMAT BERUPA OBJEK
+          else if (level && typeof level === 'object') {
+            price = Number(level.price || level.p || 0);
+            qty = Number(level.qty || level.quantity || level.q || 0);
+            notional = Number(level.notional || level.n || (price * qty));
           }
+
           return {
-            price: p,
-            qty: q,
-            notional: n,
+            price,
+            qty,
+            notional,
             orders: null,
             side
           };
         })
+        // Filter super ketat: pastikan nilai aman dari NaN, Infinite, dan harus di atas 0
         .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
 
     function normalizePriceQtySide(levels, side) {
-      if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
           const price = Number(level[0]);
@@ -953,7 +966,7 @@
             side
           };
         })
-        .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0);
+        .filter((level) => isFinite(level.price) && isFinite(level.qty));
     }
 
     function finalizeBook(book) {
@@ -979,7 +992,7 @@
       const tbody = document.getElementById(id);
       if (!tbody) return;
       if (!levels.length) {
-        tbody.innerHTML = `<tr><td colspan="4">Tidak ada data aktif</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4">-</td></tr>`;
         return;
       }
 
@@ -1120,10 +1133,10 @@
     }
 
     function readableError(error) {
-      if (error?.name === "AbortError") return "Timeout.";
+      if (error?.name === "AbortError") return "Request timeout.";
       const message = error?.message || String(error);
       if (/Failed to fetch/i.test(message)) {
-        return "Gagal sinkronisasi data.";
+        return "Data belum tersedia.";
       }
       return message;
     }
