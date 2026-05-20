@@ -739,19 +739,28 @@
       updateStatusPill(document.querySelector("#source-bca .pill"), bcaStatus.kind, bcaStatus.text);
     }
 
-    async function fetchReku() {
-      // API v2 mengembalikan properti `.bids` dan `.asks` secara literal (bukan .b atau .s)
-      const book = await fetchJson("https://api.reku.id/v2/orderbook?symbol=USDT_IDR");
+   async function fetchReku() {
+      // BYPASS PROXY: Langsung tembak API Reku menggunakan fetch bawaan browser (Tanpa melalui /proxy)
+      // Ditambahkan header cache: "no-store" agar data selalu yang paling segar (live)
+      const response = await fetch("https://api.reku.id/v2/orderbook?symbol=USDT_IDR", {
+        cache: "no-store",
+        headers: {
+          "Accept": "application/json"
+        }
+      });
       
-      const rawBids = book.bids || book.b || [];
-      const rawAsks = book.asks || book.s || [];
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText} dari api.reku.id`);
+      }
       
-      const bids = normalizeRekuSide(rawBids, "bid");
-      const asks = normalizeRekuSide(rawAsks, "ask");
+      const book = await response.json();
+      
+      // Ambil data dari objek bids dan asks bawaan API Reku v2
+      const bids = normalizeRekuSide(book.bids || book.b || [], "bid");
+      const asks = normalizeRekuSide(book.asks || book.s || [], "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        console.error("DEBUG REKU: Struktur data tidak dikenali. Ini isi respons aslinya:", book);
-        throw new Error("Format data API Reku berubah atau tidak dikenali.");
+        throw new Error("Struktur data API Reku kosong atau format tidak sesuai.");
       }
 
       return finalizeBook({
@@ -908,27 +917,24 @@
       }
     }
 
-   function normalizeRekuSide(levels, side) {
+  function normalizeRekuSide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
           let price = 0;
           let qty = 0;
 
-          // 1. JIKA FORMATNYA OBJECT (Format Standar API v2 Reku)
+          // Membaca format Objek asli Reku v2: { price: "...", volume: "..." }
           if (level && typeof level === "object" && !Array.isArray(level)) {
-            // Cek properti .price / .p dan .volume / .qty / .v
             price = Number(level.price || level.p || 0);
             qty = Number(level.volume || level.qty || level.v || 0);
           } 
-          // 2. JIKA FORMATNYA ARRAY (Format Cadangan/Bursa Lain)
+          // Antisipasi jika sewaktu-waktu berubah menjadi format Array standar
           else if (Array.isArray(level)) {
             if (level.length === 3) {
-              // Format [notional, price, qty] seperti asumsi kode awal Anda
               price = Number(level[1] || 0);
               qty = Number(level[2] || 0);
-            } else if (level.length === 2) {
-              // Format [price, qty] standar industri crypto
+            } else {
               price = Number(level[0] || 0);
               qty = Number(level[1] || 0);
             }
@@ -942,8 +948,8 @@
             side
           };
         })
-        // Filter super aman: Hanya meloloskan angka asli (bukan NaN) dan di atas angka 0
-        .filter((level) => !isNaN(level.price) && !isNaN(level.qty) && level.price > 0 && level.qty > 0);
+        // Buang data jika nilainya salah, NaN, atau 0
+        .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
     
     function normalizePriceQtySide(levels, side) {
