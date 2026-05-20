@@ -532,8 +532,8 @@
 
     const exchangeConfigs = [
       { key: "reku", name: "Reku", fetcher: fetchReku },
-      { key: "tokocrypto", name: "Tokocrypto", fetcher: fetchTokocrypto },
       { key: "indodax", name: "Indodax", fetcher: fetchIndodax },
+      { key: "tokocrypto", name: "Tokocrypto", fetcher: fetchTokocrypto },
       { key: "pintu", name: "Pintu Pro", fetcher: fetchPintu }
     ];
 
@@ -569,12 +569,6 @@
               <h3>${config.name}</h3>
               <div class="meta">USDT/IDR order book depth 10</div>
             </div>
-            <div class="exchange-meta">
-              <span class="pill delayed"><span class="status-dot"></span><span id="${config.key}-status">Waiting</span></span>
-              <span id="${config.key}-updated">Latest: -</span>
-              <span id="${config.key}-fetched">Fetched: -</span>
-            </div>
-          </div>
           <div class="exchange-stats">
             <div class="stat"><span class="small">Best Ask</span><strong id="${config.key}-best-ask">-</strong></div>
             <div class="stat"><span class="small">Best Bid</span><strong id="${config.key}-best-bid">-</strong></div>
@@ -594,7 +588,7 @@
               <div class="side-title buy"><span>Order Beli</span></div>
               <table>
                 <thead>
-                  <tr><th>#</th><th>Price</th><th>USDT</th><th>Cum. IDR</th></tr>
+                  <tr><th>#</th><th>Price</th><th>USDT</th><th>Total</th></tr>
                 </thead>
                 <tbody id="${config.key}-bids"><tr><td colspan="4">-</td></tr></tbody>
               </table>
@@ -694,11 +688,7 @@
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
-        const status = getSourceStatus(data);
-        updateStatusPill(document.querySelector(`#card-${config.key} .pill`), status.kind, status.text);
-        setText(`${config.key}-updated`, `Latest: ${latestText(data)}`);
-        setText(`${config.key}-fetched`, `Fetched: ${data?.fetchedAt ? formatDateTime(data.fetchedAt) : "-"}`);
-
+        
         setText(`${config.key}-best-bid`, data?.bestBid ? fmtIdr(data.bestBid.price) : "-");
         setText(`${config.key}-best-ask`, data?.bestAsk ? fmtIdr(data.bestAsk.price) : "-");
         setText(`${config.key}-spread`, data?.spread != null ? `${fmtIdr(data.spread)} (${fmtBps(data.spreadBps)})` : "-");
