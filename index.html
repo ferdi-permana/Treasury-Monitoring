@@ -740,17 +740,18 @@
     }
 
     async function fetchReku() {
-      const book = await fetchJson("https://api.reku.id/v2/orderbook?id=20");
+      // Menggunakan query resmi Reku v2 (?symbol=USDT_IDR) melalui fungsi internal proxy Anda
+      const book = await fetchJson("https://api.reku.id/v2/orderbook?symbol=USDT_IDR");
       
-      // Amankan properti data root jika Reku berganti nama field (bids/asks atau b/s)
-      const rawBids = book.bids || book.buy || book.b || [];
-      const rawAsks = book.asks || book.sell || book.s || [];
+      // Mengambil properti b untuk bids dan s untuk asks dari struktur root API Reku Pro v2
+      const rawBids = book.b || book.bids || book.buy || [];
+      const rawAsks = book.s || book.asks || book.sell || [];
       
       const bids = normalizeRekuSide(rawBids, "bid");
       const asks = normalizeRekuSide(rawAsks, "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Skema API Reku kosong atau tidak valid.");
+        throw new Error("Struktur array orderbook Reku kosong.");
       }
 
       return finalizeBook({
@@ -913,28 +914,28 @@
         .map((level) => {
           let price = 0, qty = 0, notional = 0;
 
-          // JIKA REKU MENGEMBALIKAN FORMAT ARRAY BISA ISI 3 ATAU ISI 2
+          // Format Utama Array Reku v2: ["price", "qty", "notional"]
           if (Array.isArray(level)) {
-            if (level.length >= 3) {
-              // Skema standar Reku v2: [notional, price, qty]
-              price = Number(level[1]);
-              qty = Number(level[2]);
-              notional = Number(level[0]);
+            if (level.length >= 2) {
+              const first = Number(level[0]);
+              const second = Number(level[1]);
+              const third = level[2] != null ? Number(level[2]) : null;
 
-              // Fallback proteksi: jika indeks tertukar [price, qty, notional]
-              if (isNaN(price) || price <= 0 || price < 100) {
-                price = Number(level[0]);
-                qty = Number(level[1]);
-                notional = price * qty;
+              // Reku standar v2 mengembalikan: [price, qty, notional]
+              // Jika elemen pertama (indeks 0) terdeteksi sebagai nominal harga (misal bernilai ribuan > 100)
+              if (first > 100) {
+                price = first;
+                qty = second;
+                notional = third != null ? third : (price * qty);
+              } else {
+                // Skenario perlindungan adaptif jika urutan indeks bergeser menjadi: [notional, price, qty]
+                price = second;
+                qty = third != null ? third : 0;
+                notional = first;
               }
-            } else if (level.length === 2) {
-              // Skema cadangan umum: [price, qty]
-              price = Number(level[0]);
-              qty = Number(level[1]);
-              notional = price * qty;
             }
           } 
-          // JIKA REKU MENGEMBALIKAN FORMAT BERUPA OBJEK
+          // Skenario perlindungan sekunder jika tipe data dikonversi dari Array ke Objek JSON terstruktur
           else if (level && typeof level === 'object') {
             price = Number(level.price || level.p || 0);
             qty = Number(level.qty || level.quantity || level.q || 0);
@@ -949,7 +950,7 @@
             side
           };
         })
-        // Filter super ketat: pastikan nilai aman dari NaN, Infinite, dan harus di atas 0
+        // Saringan super ketat: pastikan nilai aman dari NaN, Infinite, dan nominal harga wajib di atas 0
         .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
 
