@@ -295,19 +295,20 @@
     }
 
     .book-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
       margin-top: 16px;
     }
 
     .exchange-card {
       overflow: hidden;
+      min-width: 340px;
     }
 
     .exchange-head {
       display: grid;
       gap: 14px;
-      padding: 12px 14px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--line);
       background: #fbfcfe;
     }
@@ -323,7 +324,7 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       border-bottom: 1px solid var(--line);
-      background: #fdfefe;
+      background: #fafbfc;
     }
 
     .stat {
@@ -354,7 +355,7 @@
 
     .exchange-card th,
     .exchange-card td {
-      padding: 9px 10px;
+      padding: 9px 12px;
     }
 
     .book-side {
@@ -1006,24 +1007,29 @@
         return;
       }
 
-      let cumulative = 0;
+      // Membalik susunan data hanya untuk order jual (Asks) agar harga termahal berada di posisi baris teratas
       const displayLevels = side === "ask" ? [...levels].reverse() : levels;
       
       tbody.innerHTML = displayLevels.map((level, index) => {
-        cumulative += level.price * level.qty;
+        // 2. PERBAIKAN FORMULA IDR VOL BARIS:
+        // Menghitung murni Volume IDR baris ini secara riil tanpa akumulasi kumulatif (Harga x Qty USDT)
+        const realRowIdrVol = level.price * level.qty;
+        
+        // Memformat angka menjadi string desimal penuh dengan tanda pemisah ribuan titik (Tanpa pembulatan jt/M)
+        const formatIdrTabel = Math.round(realRowIdrVol).toLocaleString("id-ID");
 
+        // Logika penomoran baris terbalik (10 down to 1) untuk Order Jual, dan normal (1 up to 10) untuk Order Beli
         const rowNumber = side === "ask" ? (10 - index) : (index + 1);
-
-        const totalAkuratIdr = Math.round(cumulative).toLocaleString("id-ID");
-
+        
+        // Bersihkan teks 'Rp' pada harga level agar kolom tabel tetap rapi
         const hargaBersih = fmtIdr(level.price).replace("Rp", "").trim();
         
         return `
           <tr>
             <td>${rowNumber}</td>
-            <td>${fmtIdr(level.price)}</td>
+            <td>${hargaBersih}</td>
             <td>${fmtNumber(level.qty)}</td>
-            <td>${fmtCompact(cumulative)}</td>
+            <td>${formatIdrTabel}</td>
           </tr>
         `;
       }).join("");
