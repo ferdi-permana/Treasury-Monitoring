@@ -740,18 +740,17 @@
     }
 
     async function fetchReku() {
-      // Menggunakan query resmi Reku v2 (?symbol=USDT_IDR) melalui fungsi internal proxy Anda
+      // API v2 mengembalikan properti `.bids` dan `.asks` secara literal (bukan .b atau .s)
       const book = await fetchJson("https://api.reku.id/v2/orderbook?symbol=USDT_IDR");
       
-      // Mengambil properti b untuk bids dan s untuk asks dari struktur root API Reku Pro v2
-      const rawBids = book.b || book.bids || book.buy || [];
-      const rawAsks = book.s || book.asks || book.sell || [];
+      const rawBids = book.bids || book.b || [];
+      const rawAsks = book.asks || book.s || [];
       
       const bids = normalizeRekuSide(rawBids, "bid");
       const asks = normalizeRekuSide(rawAsks, "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Struktur array orderbook Reku kosong.");
+        throw new Error("Struktur array orderbook Reku tidak dikenali.");
       }
 
       return finalizeBook({
@@ -912,45 +911,28 @@
       if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
-          let price = 0, qty = 0, notional = 0;
+          let price = 0, qty = 0;
 
-          // Format Utama Array Reku v2: ["price", "qty", "notional"]
+          // Kasus 1: API Reku v2 bertipe Array sejati ["harga", "jumlah/volume"]
           if (Array.isArray(level)) {
-            if (level.length >= 2) {
-              const first = Number(level[0]);
-              const second = Number(level[1]);
-              const third = level[2] != null ? Number(level[2]) : null;
-
-              // Reku standar v2 mengembalikan: [price, qty, notional]
-              // Jika elemen pertama (indeks 0) terdeteksi sebagai nominal harga (misal bernilai ribuan > 100)
-              if (first > 100) {
-                price = first;
-                qty = second;
-                notional = third != null ? third : (price * qty);
-              } else {
-                // Skenario perlindungan adaptif jika urutan indeks bergeser menjadi: [notional, price, qty]
-                price = second;
-                qty = third != null ? third : 0;
-                notional = first;
-              }
-            }
+            price = Number(level[0]);
+            qty = Number(level[1]);
           } 
-          // Skenario perlindungan sekunder jika tipe data dikonversi dari Array ke Objek JSON terstruktur
+          // Kasus 2: API Reku v2 mengembalikan Objek Terstruktur { price: X, volume: Y }
           else if (level && typeof level === 'object') {
             price = Number(level.price || level.p || 0);
-            qty = Number(level.qty || level.quantity || level.q || 0);
-            notional = Number(level.notional || level.n || (price * qty));
+            qty = Number(level.volume || level.qty || level.q || 0);
           }
 
           return {
             price,
             qty,
-            notional,
+            notional: price * qty,
             orders: null,
             side
           };
         })
-        // Saringan super ketat: pastikan nilai aman dari NaN, Infinite, dan nominal harga wajib di atas 0
+        // Filter validasi: menolak NaN, tak terhingga, dan memastikan angka di atas nol
         .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
 
