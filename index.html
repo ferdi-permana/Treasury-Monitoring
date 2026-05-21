@@ -1019,7 +1019,7 @@
 
       if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
       if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Terlambat" };
-      return { kind: "error", text: "Kadaluarsa" };
+      return { kind: "error", text: "Kadaluwarsa" };
     }
 
     function formatCountdown(seconds) {
