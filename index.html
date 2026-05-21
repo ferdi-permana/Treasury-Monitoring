@@ -1002,7 +1002,7 @@
           const bcaAgeSeconds = (now - new Date(source.sourceUpdatedAt).getTime()) / 1000;
           
           if (bcaAgeSeconds > 14400) {
-            return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
+            return { kind: "delayed", text: "Pembaruan terbaru (Bank Tutup)" };
           }
           return { kind: "fresh", text: "Live (Jam Kerja)" };
         }
