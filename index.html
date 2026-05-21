@@ -302,10 +302,10 @@
     }
 
     /* Identitas Warna Pinggiran Atas Kartu Versi Lama */
-    #card-reku { border-top: 4px solid #087f5b; }
-    #card-indodax { border-top: 4px solid #b7791f; }
-    #card-tokocrypto { border-top: 4px solid #2f6f9f; }
-    #card-pintu { border-top: 4px solid #704fea; }
+    #card-reku { border-top: 4px solid #704fea; }
+    #card-indodax { border-top: 4px solid #2f6f9f; }
+    #card-tokocrypto { border-top: 4px solid #2087f5b; }
+    #card-pintu { border-top: 4px solid #00a896; }
 
     .exchange-head {
       display: grid;
@@ -345,11 +345,11 @@
       gap: 0;
     }
 
-    /* UKURAN FONT DATA TABEL LEBIH BESAR & NYAMAN DIBACA */
+  
     .exchange-card table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12.5px; 
+      font-size: 14px; 
       line-height: 1.4;
     }
 
@@ -360,7 +360,11 @@
       text-align: right;
       border-bottom: 1px solid var(--line);
       background: var(--surface-2);
-      font-size: 11px;
+      font-size: 14px;
+    }
+
+    .exchange-card th:first-child {
+      text-align: center;
     }
 
     .exchange-card td {
@@ -394,7 +398,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 12px 14px;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -712,7 +716,7 @@
 
     function renderBca() {
       const bca = state.bca;
-      const status = getSourceStatus(bca);
+      const status = getSourceStatus(bca, true); 
       updateStatusPill(document.querySelector("#source-bca .pill"), status.kind, status.text);
       setText("source-bca-latest", `Latest: ${latestText(bca)}`);
       setText("source-bca-fetched", `Fetched: ${bca?.fetchedAt ? formatDateTime(bca.fetchedAt) : "-"}`);
@@ -732,13 +736,14 @@
     function renderSourceAges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
-        const status = getSourceStatus(data);
+        const status = getSourceStatus(data, false);
         updateStatusPill(document.querySelector(`#source-${config.key} .pill`), status.kind, status.text);
         setText(`source-${config.key}-latest`, `Latest: ${latestText(data)}`);
         setText(`source-${config.key}-fetched`, `Fetched: ${data?.fetchedAt ? formatDateTime(data.fetchedAt) : "-"}`);
         setText(`source-${config.key}-age`, `Age: ${data?.fetchedAt ? relativeAge(data.fetchedAt) : "-"}`);
       });
-      const bcaStatus = getSourceStatus(state.bca);
+      
+      const bcaStatus = getSourceStatus(state.bca, true); 
       updateStatusPill(document.querySelector("#source-bca .pill"), bcaStatus.kind, bcaStatus.text);
     }
 
@@ -830,6 +835,28 @@
         || text.match(/USD\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+/i);
 
       if (!usdMatch) throw new Error("Format USD e-Rate BCA tidak terbaca.");
+
+      let sourceUpdatedAt = null;
+      if (updateMatch) {
+        try {
+          // Contoh format BCA: "21 Mei 2026 15:30 WIB" atau "21/05/2026 15:30"
+          const cleanDateStr = updateMatch[1].replace(/WIB/i, "").trim();
+          
+          // Memisahkan komponen tanggal dan waktu jika berformat DD/MM/YYYY HH:mm
+          const parts = cleanDateStr.split(/\s+/);
+          if (parts[0].includes("/")) {
+            const dmy = parts[0].split("/");
+            const hm = parts[1].split(":");
+            sourceUpdatedAt = new Date(dmy[2], dmy[1] - 1, dmy[0], hm[0], hm[1]);
+          } else {
+            // Jika format teks nama bulan (Januari, Februari, dll), buat fallback ke waktu saat ini 
+            // namun kurangi jamnya jika di luar jam kerja (opsional, atau biarkan null dulu)
+            sourceUpdatedAt = null;
+          }
+        } catch (e) {
+          sourceUpdatedAt = null;
+        }
+      }
 
       return {
         buy: parseLocaleNumber(usdMatch[1]),
@@ -955,10 +982,36 @@
     function getSourceStatus(source) {
       if (!source) return { kind: "delayed", text: "Waiting" };
       if (source.error) return { kind: "error", text: "No data" };
-      const ageSeconds = (Date.now() - new Date(source.fetchedAt).getTime()) / 1000;
-      if (ageSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
-      if (ageSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
-      return { kind: "error", text: "Stale" };
+      const now = Date.now();
+      const fetchedAgeSeconds = (now - new Date(source.fetchedAt).getTime()) / 1000;
+
+      if (isBca) {
+
+        if (source.sourceUpdatedAt) {
+          const bcaAgeSeconds = (now - new Date(source.sourceUpdatedAt).getTime()) / 1000;
+          
+
+          if (bcaAgeSeconds > 7200) {
+            return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
+          }
+          return { kind: "fresh", text: "Live (Jam Kerja)" };
+        }
+        
+    
+        const jktTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
+        const day = jktTime.getDay(); // 0 = Minggu, 6 = Sabtu
+        const hour = jktTime.getHours();
+        
+        if (day === 0 || day === 6 || hour < 8 || hour >= 16) {
+          return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
+        }
+        return { kind: "fresh", text: "Live (Jam Kerja)" };
+      }
+
+    
+      if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
+      if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
+      return { kind: "error", text: "Kadaluarsa" };
     }
 
     function formatCountdown(seconds) {
