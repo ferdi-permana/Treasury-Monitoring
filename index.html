@@ -1012,7 +1012,7 @@
         const hour = jktTime.getHours();
         
         if (day === 0 || day === 6 || hour < 8 || hour >= 16) {
-          return { kind: "delayed", text: "Latest (Bank Closed)" };
+          return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
         }
         return { kind: "fresh", text: "Live (Jam Kerja)" };
       }
