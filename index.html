@@ -715,8 +715,8 @@
     }
 
     function renderBca() {
-      const bca = state.bca;
-      const status = getSourceStatus(bca, true); 
+     const bca = state.bca;
+      const status = getSourceStatus(bca);
       updateStatusPill(document.querySelector("#source-bca .pill"), status.kind, status.text);
       setText("source-bca-latest", `Latest: ${latestText(bca)}`);
       setText("source-bca-fetched", `Fetched: ${bca?.fetchedAt ? formatDateTime(bca.fetchedAt) : "-"}`);
@@ -736,7 +736,7 @@
     function renderSourceAges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
-        const status = getSourceStatus(data, false);
+        const status = getSourceStatus(data);
         updateStatusPill(document.querySelector(`#source-${config.key} .pill`), status.kind, status.text);
         setText(`source-${config.key}-latest`, `Latest: ${latestText(data)}`);
         setText(`source-${config.key}-fetched`, `Fetched: ${data?.fetchedAt ? formatDateTime(data.fetchedAt) : "-"}`);
@@ -830,34 +830,14 @@
       const doc = new DOMParser().parseFromString(html, "text/html");
       const text = normalizeSpace(doc.body ? doc.body.innerText : html);
       const updateMatch = text.match(/Terakhir diperbarui pada\s+(.+?)\s+Kurs jual/i)
-        || text.match(/Terakhir diperbarui pada\s+(.+?WIB)/i);
+        || text.match(/Last Updated at\s+(.+?)\s+Currency exchange/i)
+        || text.match(/Terakhir diperbarui pada\s+(.+?WIB)/i)
+        || text.match(/Last Updated at\s+(.+?WIB)/i);
       const usdMatch = text.match(/USD\s+E-Rate\s+Beli\s+([\d.,]+)\s+Jual\s+([\d.,]+)/i)
-        || text.match(/USD\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+/i);
+        || text.match(/USD\s+E-Rate\s+Buy\s+([\d.,]+)\s+Sell\s+([\d.,]+)/i)
+        || text.match(/USD\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+/i);
 
       if (!usdMatch) throw new Error("Format USD e-Rate BCA tidak terbaca.");
-
-      let sourceUpdatedAt = null;
-      if (updateMatch) {
-        try {
-          // Contoh format BCA: "21 Mei 2026 15:30 WIB" atau "21/05/2026 15:30"
-          const cleanDateStr = updateMatch[1].replace(/WIB/i, "").trim();
-          
-          // Memisahkan komponen tanggal dan waktu jika berformat DD/MM/YYYY HH:mm
-          const parts = cleanDateStr.split(/\s+/);
-          if (parts[0].includes("/")) {
-            const dmy = parts[0].split("/");
-            const hm = parts[1].split(":");
-            sourceUpdatedAt = new Date(dmy[2], dmy[1] - 1, dmy[0], hm[0], hm[1]);
-          } else {
-            // Jika format teks nama bulan (Januari, Februari, dll), buat fallback ke waktu saat ini 
-            // namun kurangi jamnya jika di luar jam kerja (opsional, atau biarkan null dulu)
-            sourceUpdatedAt = null;
-          }
-        } catch (e) {
-          sourceUpdatedAt = null;
-        }
-      }
-
       return {
         buy: parseLocaleNumber(usdMatch[1]),
         sell: parseLocaleNumber(usdMatch[2]),
@@ -982,36 +962,10 @@
     function getSourceStatus(source) {
       if (!source) return { kind: "delayed", text: "Waiting" };
       if (source.error) return { kind: "error", text: "No data" };
-      const now = Date.now();
-      const fetchedAgeSeconds = (now - new Date(source.fetchedAt).getTime()) / 1000;
-
-      if (isBca) {
-
-        if (source.sourceUpdatedAt) {
-          const bcaAgeSeconds = (now - new Date(source.sourceUpdatedAt).getTime()) / 1000;
-          
-
-          if (bcaAgeSeconds > 7200) {
-            return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
-          }
-          return { kind: "fresh", text: "Live (Jam Kerja)" };
-        }
-        
-    
-        const jktTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
-        const day = jktTime.getDay(); // 0 = Minggu, 6 = Sabtu
-        const hour = jktTime.getHours();
-        
-        if (day === 0 || day === 6 || hour < 8 || hour >= 16) {
-          return { kind: "delayed", text: "Terakhir diperbarui (Bank Tutup)" };
-        }
-        return { kind: "fresh", text: "Live (Jam Kerja)" };
-      }
-
-    
-      if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
-      if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
-      return { kind: "error", text: "Kadaluarsa" };
+      const ageSeconds = (Date.now() - new Date(source.fetchedAt).getTime()) / 1000;
+      if (ageSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
+      if (ageSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
+      return { kind: "error", text: "Stale" };
     }
 
     function formatCountdown(seconds) {
