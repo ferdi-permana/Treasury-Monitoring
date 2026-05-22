@@ -639,32 +639,43 @@
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
       const targetSize = parseFloat(sizeInput.value) || 0;
-      const ratesConfig = { indodax: { makerFee: 0.000111, takerFee: 0.001111 }, tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, pintu: { makerFee: 0.001311, takerFee: 0.001811 } };
+      
+      const ratesConfig = { 
+        indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
+        tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
+        pintu: { makerFee: 0.001311, takerFee: 0.001811 } 
+      };
 
       Object.keys(ratesConfig).forEach((key) => {
-        const data = state.exchanges[key]; const config = ratesConfig[key];
-        const mEl = document.getElementById(`rate-m-${key}`), tEl = document.getElementById(`rate-t-${key}`);
+        const data = state.exchanges[key]; 
+        const config = ratesConfig[key];
+        
+        const mEl = document.getElementById(`rate-m-${key}`); 
+        const tEl = document.getElementById(`rate-t-${key}`);
+        
         if (!mEl || !tEl) return;
-        if (!data || data.error || !data.bids?.length || !data.asks?.length || targetSize <= 0) { mEl.textContent = "Rp -"; tEl.textContent = "Rp -"; return; }
+        
+        if (!data || data.error || !data.bids || !data.bids.length || !data.asks || !data.asks.length || targetSize <= 0) { 
+          mEl.textContent = "Rp -"; 
+          tEl.textContent = "Rp -"; 
+          return; 
+        }
 
         const bestBidPrice = data.bids?.[0]?.price;
-        if (bestBidPrice && !isNaN(bestBidPrice)) {
+        if (bestBidPrice && !isNaN(bestBidPrice) && config) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
           mEl.textContent = "Rp " + Math.round(netMakerPrice).toLocaleString("id-ID");
         } else {
           mEl.textContent = "Rp -";
         }
 
-        let totalCostIdr = 0, remainingSize = targetSize;
-        for (const order of data.asks) {
-          if (remainingSize <= 0) break;
-          const takeQty = Math.min(order.qty, remainingSize);
-          totalCostIdr += takeQty * order.price; remainingSize -= takeQty;
+        const bestBidPrice = data.bids?.[0]?.price;
+        if (bestBidPrice && !isNaN(bestBidPrice) && config) {
+          const netMakerPrice = bestBidPrice * (1 + config.makerFee);
+          mEl.textContent = "Rp " + Math.round(netMakerPrice).toLocaleString("id-ID");
+        } else {
+          mEl.textContent = "Rp -";
         }
-        if (remainingSize > 0) totalCostIdr += remainingSize * data.asks[data.asks.length - 1].price;
-        tEl.textContent = "Rp " + Math.round((totalCostIdr / targetSize) * (1 + config.takerFee)).toLocaleString("id-ID");
-      });
-    }
   </script>
 </body>
 </html>
