@@ -664,20 +664,100 @@ async function fetchTokocrypto() {
     function normalizeSpace(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
     function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 
-    function initTheme() { if ((localStorage.getItem("theme") || "light") === "dark") { document.documentElement.setAttribute("data-theme", "dark"); updateThemeUI(true); } }
+    function initTheme() { 
+      if ((localStorage.getItem("theme") || "light") === "dark") { 
+        document.documentElement.setAttribute("data-theme", "dark"); 
+        updateThemeUI(true); 
+      } 
+    }
+    
     function toggleTheme() {
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-      document.documentElement.toggleAttribute("data-theme", !isDark);
-      localStorage.setItem("theme", isDark ? "light" : "dark");
-      updateThemeUI(!isDark);
+      const nextDark = !isDark;
+      
+      // 1. Eksekusi perubahan warna CSS secara instan ke browser
+      document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
+      localStorage.setItem("theme", nextDark ? "dark" : "light");
+      updateThemeUI(nextDark);
+      
+      // 2. Berikan jeda micro-seconds agar animasi UI selesai, lalu jalankan kalkulasi data
+      setTimeout(() => {
+        if (typeof renderExchanges === "function") renderExchanges();
+        if (typeof calculateSimulatedRates === "function") calculateSimulatedRates();
+      }, 10);
     }
+    
     function updateThemeUI(isDark) {
-      const icon = document.getElementById("theme-icon"), text = document.getElementById("theme-text");
-      if (icon && text) { icon.textContent = isDark ? "☀️" : "🌙"; text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; }
+      const icon = document.getElementById("theme-icon");
+      const text = document.getElementById("theme-text");
+      if (icon) icon.textContent = isDark ? "☀️" : "🌙"; 
+      if (text) text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
+    }
+
+    function formatCountdown(seconds) {
+      const s = Math.max(0, Number(seconds) || 0);
+      return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+    }
+    
+    function setCycleStatus(kind, text) { 
+      updateStatusPill(els.cycleStatus, kind, text); 
+    }
+    
+    function updateStatusPill(pill, kind, text) {
+      if (!pill) return;
+      pill.className = `pill ${kind}`;
+      const dot = pill.querySelector(".status-dot");
+      if (dot) dot.className = `status-dot ${kind}`;
+      const label = pill.querySelector("span:last-child");
+      if (label) label.textContent = text;
+    }
+    
+    function latestText(source) { 
+      return source && !source.error && source.fetchedAt ? formatTime(source.fetchedAt) : "-"; 
+    }
+    
+    function relativeAge(dateValue) {
+      const s = Math.max(0, Math.floor((Date.now() - new Date(dateValue).getTime()) / 1000));
+      if (s < 60) return `${s}s`;
+      return `${Math.floor(s / 60)}m ${s % 60}s`;
+    }
+    
+    function fmtIdr(value) {
+      if (value == null || !isFinite(value)) return "Rp -";
+      return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: Math.abs(value) < 100 ? 2 : 0 }).format(value);
+    }
+    
+    function fmtNumber(value) {
+      if (value == null || !isFinite(value)) return "-";
+      return new Intl.NumberFormat("id-ID", { maximumFractionDigits: value < 1 ? 6 : 2 }).format(value);
+    }
+    
+    function formatDateTime(v) { 
+      return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(v)); 
+    }
+    
+    function formatTime(v) { 
+      return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(v)); 
+    }
+    
+    function parseLocaleNumber(v) {
+      const t = String(v).trim();
+      if (t.includes(".") && t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
+      if (t.includes(",")) return Number(t.replace(/,/g, ""));
+      return Number(t);
+    }
+    
+    function normalizeSpace(text) { 
+      return String(text || "").replace(/\s+/g, " ").trim(); 
+    }
+    
+    function setText(id, text) { 
+      const el = document.getElementById(id); 
+      if (el) el.textContent = text; 
     }
 
     // =========================================================================
-    // RENDER UI DASHBOARD: KUNCI MATANG MAKSIMAL 10 BARIS UNTUK SELURUH BURSA
+    // RENDER UI DASHBOARD: KUNCI VISUAL MAKSIMAL 10 BARIS UNTUK SELURUH BURSA
     // =========================================================================
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
@@ -687,8 +767,11 @@ async function fetchTokocrypto() {
           setText(`${config.key}-total-bid-vol`, "-");
           setText(`${config.key}-total-ask-vol`, "-");
           setText(`${config.key}-spread`, "-");
-          document.getElementById(`${config.key}-bids`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          document.getElementById(`${config.key}-asks`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          
+          const bEl = document.getElementById(`${config.key}-bids`);
+          const aEl = document.getElementById(`${config.key}-asks`);
+          if (bEl) bEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          if (aEl) aEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
           return;
         }
 
@@ -706,7 +789,7 @@ async function fetchTokocrypto() {
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        // PERBAIKAN: Seluruh bursa (termasuk Reku) dikunci ketat maksimal 10 baris ke visual UI tabel
+        // Memotong tampilan fisik tabel maksimal 10 baris teratas demi kecepatan render DOM
         const finalBids = (data.bids || []).slice(0, 10);
         const finalAsks = (data.asks || []).slice(0, 10);
 
@@ -716,14 +799,13 @@ async function fetchTokocrypto() {
     }
 
     // =========================================================================
-    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING DIPAKSA KE ATAS (MATH.CEIL)
+    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING KE ATAS (MATH.CEIL)
     // =========================================================================
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
       const targetSize = parseFloat(sizeInput.value) || 0;
       
-      // Mengunci nilai fee Pintu Pro sesuai rincian gambar: Maker 0.1311% dan Taker 0.1811%
       const ratesConfig = { 
         indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
         tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
@@ -745,17 +827,16 @@ async function fetchTokocrypto() {
           return; 
         }
 
-        // --- 1. PERHITUNGAN MAKER (M) DENGAN PADA ROUNDING KE ATAS ---
+        // --- 1. MAKER (M) ---
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
-          // Menggunakan Math.ceil() untuk memastikan pembulatan selalu dipaksa ke atas
           mEl.textContent = "Rp " + Math.ceil(netMakerPrice).toLocaleString("id-ID");
         } else {
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. PERHITUNGAN TAKER (T) LOGIKA LAST HIT PRICE & ROUNDING KE ATAS ---
+        // --- 2. TAKER (T) - LOGIKA LAST HIT PRICE ---
         let remainingSize = targetSize;
         let lastHitPrice = 0;
         
@@ -774,9 +855,7 @@ async function fetchTokocrypto() {
         
         if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
           const netTakerPrice = lastHitPrice * (1 + config.takerFee);
-          
-          // Menggunakan Math.ceil() untuk memastikan hasil taker selalu dibulatkan ke atas (Exact Number)
-          tEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
+          mEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
         }
