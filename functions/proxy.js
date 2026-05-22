@@ -2,6 +2,8 @@ const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
   "cloudme-toko.2meta.app",
+  "api.tokocrypto.com",
+  "api.allorigins.win",
   "indodax.com",
   "api.pintu.pro",
   "api.pintupro.com",
@@ -72,12 +74,11 @@ function corsHeaders() {
   };
 }
 
-function jsonResponse(payload, status) {
-  return new Response(JSON.stringify(payload), {
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
     status,
     headers: {
       ...corsHeaders(),
-      "Cache-Control": "no-store",
       "Content-Type": "application/json; charset=utf-8"
     }
   });
