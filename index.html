@@ -664,6 +664,9 @@ async function fetchTokocrypto() {
     function normalizeSpace(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
     function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 
+    // =========================================================================
+    // OPTIMISASI UTILITY FUNCTIONS & THEME SWITCHER (ANTI-LAG)
+    // =========================================================================
     function initTheme() { 
       if ((localStorage.getItem("theme") || "light") === "dark") { 
         document.documentElement.setAttribute("data-theme", "dark"); 
@@ -675,7 +678,7 @@ async function fetchTokocrypto() {
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";
       const nextDark = !isDark;
       
-      // 1. Eksekusi perubahan warna CSS secara instan ke browser
+      // 1. Eksekusi perubahan warna CSS secara instan ke browser (Mencegah Stuck)
       document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
       localStorage.setItem("theme", nextDark ? "dark" : "light");
       updateThemeUI(nextDark);
@@ -757,7 +760,7 @@ async function fetchTokocrypto() {
     }
 
     // =========================================================================
-    // RENDER UI DASHBOARD: KUNCI VISUAL MAKSIMAL 10 BARIS UNTUK SELURUH BURSA
+    // RENDER UI DASHBOARD: VISUAL DIPOTONG KETAT MAKSIMAL TOP 10 BARIS
     // =========================================================================
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
@@ -789,7 +792,7 @@ async function fetchTokocrypto() {
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        // Memotong tampilan fisik tabel maksimal 10 baris teratas demi kecepatan render DOM
+        // Memotong tampilan visual tabel agar seragam maksimal 10 baris teratas
         const finalBids = (data.bids || []).slice(0, 10);
         const finalAsks = (data.asks || []).slice(0, 10);
 
@@ -806,6 +809,7 @@ async function fetchTokocrypto() {
       if (!sizeInput) return;
       const targetSize = parseFloat(sizeInput.value) || 0;
       
+      // Penguncian Fee & Pajak Pintu Pro (M: 0.1311% | T: 0.1811%) sesuai instruksi Anda
       const ratesConfig = { 
         indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
         tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
@@ -827,35 +831,38 @@ async function fetchTokocrypto() {
           return; 
         }
 
-        // --- 1. MAKER (M) ---
+        // --- 1. MAKER (M) + ROUNDING KE ATAS MURNI ---
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
+          // Math.ceil() memastikan desimal sekecil apa pun dibulatkan ke atas
           mEl.textContent = "Rp " + Math.ceil(netMakerPrice).toLocaleString("id-ID");
         } else {
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. TAKER (T) - LOGIKA LAST HIT PRICE ---
+        // --- 2. TAKER (T) + LOGIKA DEFINITIF LAST HIT PRICE + ROUNDING KE ATAS MURNI ---
         let remainingSize = targetSize;
         let lastHitPrice = 0;
         
+        // Menyisir antrean ask dari harga termurah hingga volume pesanan habis
         for (const order of data.asks) {
           const price = Number(order.price || 0);
           const qty = Number(order.qty || 0);
           if (price <= 0 || qty <= 0) continue;
 
-          lastHitPrice = price;
+          lastHitPrice = price; // Mencatat harga eksekusi berjalan
           remainingSize -= qty;
           
           if (remainingSize <= 0) {
-            break;
+            break; // Berhenti seketika saat volume target terpenuhi
           }
         }
         
         if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
           const netTakerPrice = lastHitPrice * (1 + config.takerFee);
-          mEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
+          // Math.ceil() menjamin Exact Number bulat ke atas tanpa toleransi pecahan
+          tEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
         }
