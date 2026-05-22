@@ -716,7 +716,7 @@ async function fetchTokocrypto() {
     }
 
     // =========================================================================
-    // SIMULATOR: PROSES MENDALAM DENGAN EXACT NUMBER (VWAP VALUE)
+    // SIMULATOR TAKER: LOGIKA MATEMATIKA BERDASARKAN LAST HIT PRICE (EXACT NUMBER)
     // =========================================================================
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
@@ -744,7 +744,8 @@ async function fetchTokocrypto() {
           return; 
         }
 
-        // --- 1. MAKER (M) ---
+        // --- 1. PERHITUNGAN MAKER (M) ---
+        // Maker mengeksekusi harga terbaik di Bid Teratas (Best Bid)
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
@@ -753,35 +754,36 @@ async function fetchTokocrypto() {
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. TAKER (T) ---
-        let totalCostIdr = 0; 
-        let sizeAccumulated = 0; 
+        // --- 2. PERHITUNGAN TAKER (T) - LOGIKA LAST HIT PRICE ---
         let remainingSize = targetSize;
+        let lastHitPrice = 0;
         
+        // Telusuri antrean ask dari harga terendah ke tertinggi
         for (const order of data.asks) {
-          if (remainingSize <= 0) break;
           const price = Number(order.price || 0);
           const qty = Number(order.qty || 0);
           if (price <= 0 || qty <= 0) continue;
 
-          const takeQty = Math.min(qty, remainingSize);
-          totalCostIdr += takeQty * price; 
-          sizeAccumulated += takeQty;
-          remainingSize -= takeQty;
-        }
-        
-        if (remainingSize > 0) {
-          const lastAskPrice = Number(data.asks[data.asks.length - 1]?.price || 0);
-          if (lastAskPrice > 0) {
-            totalCostIdr += remainingSize * lastAskPrice;
-            sizeAccumulated += remainingSize;
+          // Catat harga saat ini sebagai harga eksekusi terakhir
+          lastHitPrice = price;
+          
+          // Kurangi sisa pesanan dengan volume yang tersedia di baris ini
+          remainingSize -= qty;
+          
+          // Jika sisa ukuran beli sudah habis (<= 0), hentikan pencarian karena harga target sudah ketemu
+          if (remainingSize <= 0) {
+            break;
           }
         }
         
-        const avgTakerBasePrice = sizeAccumulated > 0 ? (totalCostIdr / sizeAccumulated) : 0;
+        // Pengaman: Jika ukuran pesanan raksasa melebihi total seluruh baris order book di API,
+        // maka lastHitPrice akan otomatis menggunakan harga baris paling terakhir (termahal) yang tersedia.
         
-        if (avgTakerBasePrice > 0 && !isNaN(avgTakerBasePrice) && isFinite(avgTakerBasePrice)) {
-          const netTakerPrice = avgTakerBasePrice * (1 + config.takerFee);
+        if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
+          // Basis perhitungan langsung menggunakan Last Hit Price + Fee & Tax
+          const netTakerPrice = lastHitPrice * (1 + config.takerFee);
+          
+          // Cetak EXACT NUMBER bulat bersih tanpa pecahan desimal belakang koma
           tEl.textContent = "Rp " + Math.round(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
