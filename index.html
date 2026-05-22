@@ -467,10 +467,8 @@
       });
     }
 async function fetchTokocrypto() {
-      // Mengambil data kedalaman 100 baris dari API Tokocrypto lewat proxy
-      const response = await fetchRemote("https://cloudme-toko.2meta.app/api/v3/depth?symbol=USDTBIDR&limit=100", "application/json");
-      if (!response.ok) throw new Error(`${response.status} dari Tokocrypto`);
-      const payload = await response.json();
+       const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=100";
+      const payload = await fetchJson(url);
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
