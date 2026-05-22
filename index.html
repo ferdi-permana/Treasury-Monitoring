@@ -30,7 +30,6 @@
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    /* Variabel khusus ketika Mode Gelap Aktif (Hanya mengganti warna, tidak mengubah posisi) */
     [data-theme="dark"] {
       --bg: #0d1117;
       --surface: #161b22;
@@ -124,6 +123,7 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-end;
+      align-items: center;
       gap: 10px;
       min-width: 280px;
     }
@@ -158,12 +158,16 @@
       gap: 16px;
     }
 
+    /* Mengatur area snapshot atas agar BCA (kiri) dan Simulator (kanan) sejajar horizontal */
     .snapshot-grid {
-      grid-template-columns: minmax(280px, 480px);
-      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+      align-items: stretch;
     }
 
-    .panel, .exchange-card {
+    .panel, .simulator-panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -174,12 +178,154 @@
       padding: 16px;
     }
 
-    .panel-title {
+    /* Kartu BCA memakan 4 kolom dari total 12 kolom */
+    .bca-panel {
+      grid-column: span 4;
+    }
+
+    /* KOTAK MERAH: Panel Simulator memakan sisa ruang (8 kolom dari 12 kolom) */
+    .simulator-panel {
+      grid-column: span 8;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .bca-rate-grid {
+      display: flex;
+      gap: 24px;
+      margin: 12px 0;
+    }
+
+    .bca-rate-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .bca-rate-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .bca-rate-number {
+      font-size: 24px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bca-rate-number.trend-buy { color: var(--buy); }
+    .bca-rate-number.trend-sell { color: var(--sell); }
+
+    .meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sim-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .sim-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 100%;
+    }
+
+    /* Input Size劈 USDT di sisi kiri panel simulator */
+    .sim-input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 0 0 140px;
+    }
+
+    .sim-input-wrapper label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .sim-input-wrapper input {
+      width: 100%;
+      min-height: 38px;
+      font-weight: 700;
+      font-size: 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--ink);
+      text-align: center;
+    }
+
+    /* Tampilan Hasil Rate 3 Bursa di sisi kanan simulator */
+    .sim-results-wrapper {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      justify-content: flex-end;
+    }
+
+    .sim-exchange-result {
+      background: var(--surface-2);
+      border-radius: 6px;
+      padding: 10px 14px;
+      min-width: 175px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sim-ex-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .sim-rate-row {
       display: flex;
       justify-content: space-between;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sim-rate-row .rate-val {
+      font-weight: 700;
+    }
+    .sim-rate-row .rate-val.m { color: var(--buy); }
+    .sim-rate-row .rate-val.t { color: var(--info); }
+
+    /* KOTAK BIRU: Tombol Saklar Tema Baru Ramping di Toolbar Kanan Atas */
+    .theme-toggle {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      min-height: 36px;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
+      gap: 6px;
+      margin-right: 4px;
     }
 
     h2, h3 {
@@ -190,203 +336,80 @@
     h2 { font-size: 18px; }
     h3 { font-size: 16px; }
 
-    .metric-value {
-      display: block;
-      margin-top: 6px;
-      font-size: clamp(22px, 2.3vw, 32px);
-      line-height: 1.08;
-      font-weight: 750;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .metric-label, .meta, .small {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .metric-label {
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      font-weight: 700;
-    }
-
-    .bca-rate-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      margin-top: 12px;
-      border-top: 1px solid var(--line);
-    }
-
-    .bca-rate-item {
-      padding-top: 12px;
-      min-width: 0;
-    }
-
-    .bca-rate-item + .bca-rate-item {
-      border-left: 1px solid var(--line);
-      padding-left: 16px;
-      margin-left: 16px;
-    }
-
-    .bca-rate-label {
-      display: block;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .bca-rate-number {
-      display: block;
-      margin-top: 5px;
-      font-size: clamp(22px, 2.3vw, 30px);
-      line-height: 1.08;
-      font-weight: 750;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .trend-buy { color: var(--buy); }
-    .trend-sell { color: var(--sell); }
-
-    /* Pengatur Baris Judul Order Book Sekaligus Wadah Tombol Tema di Kanan */
     .orderbook-section-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       margin-top: 24px;
       margin-bottom: 12px;
     }
 
-    .orderbook-section-title h2 {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    /* Tombol Tema Elegan (Pas di Atas Pintu Pro sebelah Kanan) */
-    .theme-toggle {
-      background: var(--surface);
-      color: var(--ink);
-      border: 1px solid var(--line);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-      transition: all 0.2s ease;
-    }
-
-    .theme-toggle:hover {
-      background: var(--surface-2);
-      border-color: var(--ink);
-    }
-
-    /* BALIK KE STRUKTUR GRID KARTU KEMBALI NORMAL & HORIZONTAL */
+    /* Memastikan kontainer grid bursa terkunci horizontal 4 kolom berdampingan */
     .book-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 20px;
-      margin-top: 0;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 16px;
     }
 
     .exchange-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
       overflow: hidden;
-      min-width: 350px;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Identitas Warna Pinggiran Atas Kartu Versi Lama */
     #card-reku { border-top: 4px solid #704fea; }
     #card-indodax { border-top: 4px solid #2f6f9f; }
     #card-tokocrypto { border-top: 4px solid #087f5b; }
     #card-pintu { border-top: 4px solid #00a896; }
 
     .exchange-head {
-      display: grid;
-      gap: 14px;
-      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 16px 16px 12px;
       border-bottom: 1px solid var(--line);
-      background: var(--surface);
     }
 
     .exchange-stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      border-bottom: 1px solid var(--line);
       background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
     }
 
     .stat {
-      padding: 12px 14px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat:not(:last-child) {
       border-right: 1px solid var(--line);
     }
 
-    .stat:last-child {
-      border-right: 0;
+    .stat .small {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 500;
     }
 
     .stat strong {
-      display: block;
-      margin-top: 4px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
-      font-variant-numeric: tabular-nums;
     }
 
     .book-tables {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0;
-    }
-
-  
-    .exchange-card table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px; 
-      line-height: 1.4;
-    }
-
-    .exchange-card th {
-      padding: 10px 12px;
-      font-weight: 700;
-      color: var(--muted);
-      text-align: right;
-      border-bottom: 1px solid var(--line);
-      background: var(--surface-2);
-      font-size: 14px;
-    }
-
-    .exchange-card th:first-child {
-      text-align: center;
-    }
-
-    .exchange-card td {
-      padding: 9px 12px;
-      text-align: right;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.03);
-      color: var(--ink);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .exchange-card td:nth-child(2) {
-      font-weight: 600;
-    }
-
-    .exchange-card td:first-child {
-      color: var(--muted);
-      font-weight: 500;
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
     }
 
     .book-side {
-      overflow-x: auto;
+      flex: 1;
     }
 
     .book-side:first-child {
@@ -394,80 +417,81 @@
     }
 
     .side-title {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px;
-      font-size: 13px;
-      font-weight: 800;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
     }
 
-    .side-title.buy {
-      color: var(--buy);
-      background: var(--buy-bg);
+    .side-title.buy { background: var(--buy-bg); color: var(--buy); }
+    .side-title.sell { background: var(--sell-bg); color: var(--sell); }
+
+    .exchange-card table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
     }
 
-    .side-title.sell {
-      color: var(--sell);
-      background: var(--sell-bg);
+    .exchange-card th {
+      padding: 6px 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-align: right;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
+      font-size: 10px;
+    }
+
+    .exchange-card th:first-child {
+      text-align: center;
+      width: 35px;
+    }
+
+    .exchange-card td {
+      padding: 6px 12px;
+      text-align: right;
+      border-bottom: 1px solid rgba(0,0,0,0.03);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .exchange-card td:first-child {
+      color: var(--muted);
+      text-align: center;
+      font-weight: 500;
     }
 
     .source-grid {
-      grid-template-columns: repeat(5, minmax(180px, 1fr));
-      margin-top: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(24px, 1fr));
+      margin-top: 32px;
     }
 
     .source-box {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 12px;
       background: var(--surface);
-      min-height: 104px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
     .source-box strong {
-      display: block;
-      margin: 6px 0 5px;
+      font-size: 14px;
     }
 
-    .mono {
-      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-      font-size: 12px;
-    }
-
-    .footer-note {
-      margin-top: 18px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    @media (max-width: 1180px) {
-      .source-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
-      .book-grid { grid-template-columns: repeat(2, minmax(300px, 1fr)); }
+    @media (max-width: 1200px) {
+      .snapshot-grid { grid-template-columns: 1fr; }
+      .bca-panel, .simulator-panel { grid-column: span 12; }
+      .book-grid { grid-template-columns: repeat(2, 1fr); }
+      .sim-row { flex-direction: column; align-items: stretch; }
+      .sim-results-wrapper { flex-wrap: wrap; justify-content: flex-start; }
+      .sim-exchange-result { flex: 1; }
     }
 
     @media (max-width: 760px) {
-      .page { padding: 16px; }
-      .topbar { display: grid; }
-      .toolbar { justify-content: flex-start; min-width: 0; }
-      .snapshot-grid, .source-grid { grid-template-columns: 1fr; }
-      .bca-rate-grid { grid-template-columns: 1fr; }
-      .bca-rate-item + .bca-rate-item {
-        border-left: 0;
-        border-top: 1px solid var(--line);
-        padding-left: 0;
-        margin-left: 0;
-        margin-top: 12px;
-      }
-      .orderbook-section-title { flex-direction: column; align-items: flex-start; gap: 10px; }
       .book-grid { grid-template-columns: 1fr; }
-      .exchange-stats, .book-tables { grid-template-columns: 1fr; }
-      .stat, .book-side:first-child {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .toolbar { justify-content: flex-start; width: 100%; }
     }
   </style>
 </head>
@@ -479,14 +503,18 @@
         <div class="subtitle">Reku, Tokocrypto, Indodax, Pintu Pro, dan BCA e-Rate</div>
       </div>
       <div class="toolbar">
+        <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">
+          <span id="theme-icon">🌙</span> <span id="theme-text">Mode Gelap</span>
+        </button>
+        
         <span class="pill" id="cycle-status"><span class="status-dot delayed"></span><span>Menunggu data</span></span>
         <span class="pill">Perbarui dalam: <strong id="countdown">5m 00s</strong></span>
         <button class="primary" id="refresh-button" type="button">Perbarui</button>
       </div>
     </header>
 
-    <section class="grid snapshot-grid" aria-label="BCA e-Rate">
-      <div class="panel">
+    <section class="snapshot-grid" aria-label="BCA dan Simulator">
+      <div class="panel bca-panel">
         <span class="metric-label">BCA e-Rate USD</span>
         <div class="bca-rate-grid">
           <div class="bca-rate-item">
@@ -500,22 +528,55 @@
         </div>
         <span class="meta" id="bca-updated">-</span>
       </div>
+
+      <div class="simulator-panel">
+        <div class="sim-header">Simulasi Beli USDT (Harga Bersih)</div>
+        <div class="sim-row">
+          <div class="sim-input-wrapper">
+            <label for="calc-usdt-size">Ukuran USDT</label>
+            <input type="number" id="calc-usdt-size" value="100" min="1" step="50" oninput="calculateSimulatedRates()">
+          </div>
+          
+          <div class="sim-results-wrapper">
+            <div class="sim-exchange-result">
+              <span class="sim-ex-title" style="color: #2f6f9f;">Indodax Rate</span>
+              <div class="sim-rate-row">
+                <span>Maker (M):</span> <span class="rate-val m" id="rate-m-indodax">Rp -</span>
+              </div>
+              <div class="sim-rate-row">
+                <span>Taker (T):</span> <span class="rate-val t" id="rate-t-indodax">Rp -</span>
+              </div>
+            </div>
+            
+            <div class="sim-exchange-result">
+              <span class="sim-ex-title" style="color: #087f5b;">Tokocrypto Rate</span>
+              <div class="sim-rate-row">
+                <span>Maker (M):</span> <span class="rate-val m" id="rate-m-tokocrypto">Rp -</span>
+              </div>
+              <div class="sim-rate-row">
+                <span>Taker (T):</span> <span class="rate-val t" id="rate-t-tokocrypto">Rp -</span>
+              </div>
+            </div>
+
+            <div class="sim-exchange-result">
+              <span class="sim-ex-title" style="color: #00a896;">Pintu Rate</span>
+              <div class="sim-rate-row">
+                <span>Maker (M):</span> <span class="rate-val m" id="rate-m-pintu">Rp -</span>
+              </div>
+              <div class="sim-rate-row">
+                <span>Taker (T):</span> <span class="rate-val t" id="rate-t-pintu">Rp -</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <div class="orderbook-section-title">
-      <h2>Top 10 Volume Order Book USDT/IDR</h2>
-      <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">
-        <span id="theme-icon">🌙</span> <span id="theme-text">Mode Gelap</span>
-      </button>
+      <h2 style="font-size:14px; font-weight:700; color:var(--muted); letter-spacing:0.05em;">TOP 10 VOLUME ORDER BOOK USDT/IDR</h2>
     </div>
-
-    <section class="grid book-grid" id="exchange-grid" aria-label="Order books"></section>
-
-    <section class="grid source-grid" id="source-grid" aria-label="Latest updates"></section>
-
-    <div class="footer-note">
-      Data otomatis diperbarui setiap 5 menit. Semua waktu ditampilkan dalam WIB.
-    </div>
+    <section class="book-grid" id="exchange-grid"></section>
+    <section class="grid source-grid" id="source-grid" style="display:none;"></section>
   </main>
 
   <script>
@@ -568,7 +629,7 @@
           <div class="exchange-head">
             <div>
               <h3>${config.name}</h3>
-              <div class="meta">Top 10 volume order book USDT/IDR </div>
+              <div class="meta"> </div>
             </div>
           </div>
           <div class="exchange-stats">
@@ -623,7 +684,7 @@
       setCycleStatus("delayed", "Refreshing...");
       els.refreshButton.disabled = true;
 
-      const results = await Promise.all([
+      await Promise.all([
         ...exchangeConfigs.map(async (config) => {
           try {
             const data = await config.fetcher();
@@ -659,12 +720,14 @@
         })()
       ]);
 
-      void results;
       state.inFlight = false;
       els.refreshButton.disabled = false;
       state.countdown = REFRESH_SECONDS;
       els.countdown.textContent = formatCountdown(state.countdown);
       setCycleStatus("fresh", `Updated ${formatTime(new Date())}`);
+
+      // MEMANGGIL SIMULATOR & RENDER UTAMA (Sudah rapi dan sinkron)
+      calculateSimulatedRates();
       render();
     }
 
@@ -685,6 +748,7 @@
       renderExchanges();
       renderBca();
       renderSourceAges();
+      calculateSimulatedRates();
     }
 
     function renderExchanges() {
@@ -715,7 +779,7 @@
     }
 
     function renderBca() {
-     const bca = state.bca;
+      const bca = state.bca;
       const status = getSourceStatus(bca);
       updateStatusPill(document.querySelector("#source-bca .pill"), status.kind, status.text);
       setText("source-bca-latest", `Latest: ${latestText(bca)}`);
@@ -779,15 +843,72 @@
       });
     }
 
+    // ANTIPERPUTUSAN API TOKOCRYPTO (DUAL ENDPOINT FALLBACK STRATEGY)
     async function fetchTokocrypto() {
-      const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=10";
-      const payload = await fetchJson(url);
-      const data = payload.data || payload;
-      const bids = normalizePriceQtySide(data.bids || [], "bid");
-      const asks = normalizePriceQtySide(data.asks || [], "ask");
+      let book = null;
+      let errorFetch = null;
+
+      try {
+        const response = await fetchRemote("https://api.tokocrypto.com/open/v1/market/depth?symbol=USDT_BIDR&limit=10", "application/json");
+        if (response.ok) {
+          const resJson = await response.json();
+          book = resJson.data || resJson;
+        } else {
+          errorFetch = `HTTP ${response.status}`;
+        }
+      } catch (e) {
+        errorFetch = e.message;
+      }
+
+      if (!book || !book.bids) {
+        try {
+          const responseFallback = await fetchRemote("https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10", "application/json");
+          if (responseFallback.ok) {
+            book = await responseFallback.json();
+          } else {
+            throw new Error(`Fallback Error: HTTP ${responseFallback.status}`);
+          }
+        } catch (fallbackError) {
+          throw new Error(`Tokocrypto API Down (${errorFetch} -> ${fallbackError.message})`);
+        }
+      }
+
+      const rawBids = book.bids || book.b || [];
+      const rawAsks = book.asks || book.a || book.s || [];
+
+      const bids = rawBids.slice(0, 10).map((level) => {
+        const price = Number(level[0] || 0);
+        const qty = Number(level[1] || 0);
+        return { price, qty, notional: price * qty, side: "bid" };
+      }).filter((l) => l.price > 0 && l.qty > 0);
+
+      const asks = rawAsks.slice(0, 10).map((level) => {
+        const price = Number(level[0] || 0);
+        const qty = Number(level[1] || 0);
+        return { price, qty, notional: price * qty, side: "ask" };
+      }).filter((l) => l.price > 0 && l.qty > 0);
+
+      if (bids.length === 0 && asks.length === 0) throw new Error("Order book kosong.");
+
+      return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null });
+    }
+
+    async function fetchIndodax() {
+      const book = await fetchJsonWithCandidates([
+        "https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"
+      ]);
+      const bids = normalizePriceQtySide(book.buy || book.bids || [], "bid");
+      const asks = normalizePriceQtySide(book.sell || book.asks || [], "ask");
+      let ticker = null;
+      try {
+        ticker = await fetchJsonWithCandidates([
+          "https://indodax.com/api/ticker/usdtidr", "https://indodax.com/api/ticker/usdt_idr"
+        ]);
+      } catch (e) { ticker = null; }
+      const serverTime = Number(ticker?.ticker?.server_time || ticker?.server_time);
       return finalizeBook({
         symbol: "USDTIDR", bids, asks, fetchedAt: new Date(),
-        sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null
+        sourceUpdatedAt: serverTime ? new Date(serverTime * 1000) : null
       });
     }
 
@@ -897,7 +1018,7 @@
     }
 
     function normalizeRekuSide(levels, side) {
-     if (!Array.isArray(levels)) return [];
+      if (!Array.isArray(levels)) return [];
       return levels
         .map((level) => {
           let price = 0;
@@ -917,13 +1038,7 @@
             }
           }
 
-          return {
-            price,
-            qty,
-            notional: price * qty,
-            orders: null,
-            side
-          };
+          return { price, qty, notional: price * qty, orders: null, side };
         })
         .filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
@@ -981,7 +1096,6 @@
       if (isBca) {
         if (source.sourceUpdatedAt) {
           const bcaAgeSeconds = (now - new Date(source.sourceUpdatedAt).getTime()) / 1000;
-          
           if (bcaAgeSeconds > 14400) {
             return { kind: "delayed", text: "Pembaruan terbaru (Bank Tutup)" };
           }
@@ -1096,6 +1210,61 @@
       } else {
         icon.textContent = "🌙"; text.textContent = "Mode Gelap";
       }
+    }
+
+    // FUNGSI LOGIKA MESIN SIMULATOR HITUNG REALTIME
+    function calculateSimulatedRates() {
+      const sizeInput = document.getElementById("calc-usdt-size");
+      if (!sizeInput) return;
+      
+      const targetSize = parseFloat(sizeInput.value) || 0;
+      
+      const ratesConfig = {
+        indodax: { makerFee: 0.000111, takerFee: 0.001111 },
+        tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 },
+        pintu: { makerFee: 0.001311, takerFee: 0.001811 }
+      };
+
+      Object.keys(ratesConfig).forEach((key) => {
+        const data = state.exchanges[key];
+        const config = ratesConfig[key];
+        
+        const mEl = document.getElementById(`rate-m-${key}`);
+        const tEl = document.getElementById(`rate-t-${key}`);
+        
+        if (!mEl || !tEl) return;
+        
+        if (!data || data.error || !data.bids || !data.bids.length || !data.asks || !data.asks.length || targetSize <= 0) {
+          mEl.textContent = "Rp -";
+          tEl.textContent = "Rp -";
+          return;
+        }
+
+        // MAKER (M)
+        const bestBidPrice = data.bids[0].price;
+        const netMakerPrice = bestBidPrice * (1 + config.makerFee);
+        mEl.textContent = "Rp " + Math.round(netMakerPrice).toLocaleString("id-ID");
+
+        // TAKER (T)
+        let totalCostIdr = 0;
+        let remainingSize = targetSize;
+        
+        for (const order of data.asks) {
+          if (remainingSize <= 0) break;
+          const takeQty = Math.min(order.qty, remainingSize);
+          totalCostIdr += takeQty * order.price;
+          remainingSize -= takeQty;
+        }
+
+        if (remainingSize > 0) {
+          const lastAskPrice = data.asks[data.asks.length - 1].price;
+          totalCostIdr += remainingSize * lastAskPrice;
+        }
+
+        const avgTakerBasePrice = totalCostIdr / targetSize;
+        const netTakerPrice = avgTakerBasePrice * (1 + config.takerFee);
+        tEl.textContent = "Rp " + Math.round(netTakerPrice).toLocaleString("id-ID");
+      });
     }
   </script>
 </body>
