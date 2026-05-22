@@ -845,14 +845,39 @@
       });
     }
 
-    // KEMBALI KE KODE SEBELUMNYA: Setelan awal endpoint asli Tokocrypto Anda
     async function fetchTokocrypto() {
-      const book = await fetchJson("https://api.tokocrypto.com/open/v1/market/depth?symbol=USDT_BIDR&limit=10");
-      const bids = normalizePriceQtySide(book.bids || book.buy || [], "bid");
-      const asks = normalizePriceQtySide(book.asks || book.sell || [], "ask");
-      return finalizeBook({
-        symbol: "USDT_BIDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null
-      });
+      const targetUrl = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10";
+      
+      const proxiedUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      
+      const response = await fetchWithTimeout(proxiedUrl);
+      if (!response.ok) {
+        throw new Error(`Proxy Publik gagal mengambil data Tokocrypto (HTTP ${response.status})`);
+      }
+      
+      const wrapper = await response.json();
+      const book = typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper.contents;
+      
+      const rawBids = book.bids || [];
+      const rawAsks = book.asks || [];
+
+      const bids = rawBids.map((level) => {
+        const price = Number(level[0]);
+        const qty = Number(level[1]);
+        return { price, qty, notional: price * qty, side: "bid" };
+      }).filter((l) => isFinite(l.price) && l.qty > 0);
+
+      const asks = rawAsks.map((level) => {
+        const price = Number(level[0]);
+        const qty = Number(level[1]);
+        return { price, qty, notional: price * qty, side: "ask" };
+      }).filter((l) => isFinite(l.price) && l.qty > 0);
+
+      if (bids.length === 0 && asks.length === 0) {
+        throw new Error("Struktur data dari proxy kosong.");
+      }
+
+      return finalizeBook({ symbol: "USDT_BIDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null });
     }
 
     async function fetchIndodax() {
