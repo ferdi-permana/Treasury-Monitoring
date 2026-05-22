@@ -445,8 +445,7 @@
     }
 
     async function fetchTokocrypto() {
-      // Mengarahkan request ke api.tokocrypto.com lewat whitelist proxy internal
-      const response = await fetchRemote("https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10", "application/json");
+      const response = await fetchRemote("https://cloudme-toko.2meta.app/api/v3/depth?symbol=USDTBIDR&limit=10", "application/json");
       if (!response.ok) throw new Error(`HTTP ${response.status} dari Tokocrypto`);
       const book = await response.json();
       const bids = normalizePriceQtySide(book.bids || [], "bid");
@@ -527,20 +526,32 @@
       try { return await fetch(url, { ...options, cache: "no-store", signal: controller.signal }); } finally { clearTimeout(timeout); }
     }
 
-    function normalizeRekuSide(levels, side) {
+      function normalizeRekuSide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels.map((level) => {
         let price = 0, qty = 0;
+        
         if (level && typeof level === "object" && !Array.isArray(level)) {
-          price = Number(level.price || level.p || 0); qty = Number(level.volume || level.qty || level.v || 0);
+          // Format 1: Jika berbentuk Objek biasa
+          price = Number(level.price || level.p || 0); 
+          qty = Number(level.volume || level.qty || level.v || 0);
         } else if (Array.isArray(level)) {
-          if (level.length === 3) { price = Number(level[1] || 0); qty = Number(level[2] || 0); }
-          else { price = Number(level[0] || 0); qty = Number(level[1] || 0); }
+          // Format 2 & 3: Jika berbentuk Array
+          if (level.length === 3) {
+            // Jika ada 3 elemen (biasanya [id, price, qty])
+            price = Number(level[1] || 0); 
+            qty = Number(level[2] || 0); 
+          } else {
+            // Jika ada 2 elemen ([price, qty])
+            price = Number(level[0] || 0); 
+            qty = Number(level[1] || 0);
+          }
         }
+        
         return { price, qty, notional: price * qty, side };
       }).filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
-    
+      
     function normalizePriceQtySide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels.map((level) => {
