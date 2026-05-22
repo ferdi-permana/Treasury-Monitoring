@@ -435,7 +435,7 @@
       updateStatusPill(document.querySelector("#source-bca .pill"), bcaStatus.kind, bcaStatus.text);
     }
 
-    async function fetchReku() {
+   async function fetchReku() {
       const response = await fetch("https://api.reku.id/v2/orderbook?symbol=USDT_IDR", {
         cache: "no-store",
         headers: {
@@ -466,9 +466,11 @@
         note: "Reku Pro symbol: USDT_IDR"
       });
     }
- async function fetchTokocrypto() {
-      const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=100";
-      const payload = await fetchJson(url);
+async function fetchTokocrypto() {
+      // Mengambil data kedalaman 100 baris dari API Tokocrypto lewat proxy
+      const response = await fetchRemote("https://cloudme-toko.2meta.app/api/v3/depth?symbol=USDTBIDR&limit=100", "application/json");
+      if (!response.ok) throw new Error(`${response.status} dari Tokocrypto`);
+      const payload = await response.json();
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
@@ -477,8 +479,10 @@
         sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null
       });
     }
+
     async function fetchIndodax() {
-     const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
+      // Mengambil data order book penuh dari API Indodax lewat proxy
+      const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
       const bids = normalizePriceQtySide(book.buy || book.bids || [], "bid");
       const asks = normalizePriceQtySide(book.sell || book.asks || [], "ask");
       let ticker = null;
@@ -486,14 +490,26 @@
       const serverTime = Number(ticker?.ticker?.server_time || ticker?.server_time);
       return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: serverTime ? new Date(serverTime * 1000) : null });
     }
+
     async function fetchPintu() {
-      const payload = await fetchJsonWithCandidates(["https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR", "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR"]);
+      // Perbaikan Endpoint & Fallback Struktur Data Pintu Pro agar tidak memicu status Error / No Data
+      const payload = await fetchJsonWithCandidates([
+        "https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR&depth=20",
+        "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR&depth=20"
+      ]);
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
-      return finalizeBook({ symbol: data.symbol || "USDT-IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null });
+      return finalizeBook({ 
+        symbol: data.symbol || "USDT-IDR", 
+        bids, 
+        asks, 
+        fetchedAt: new Date(), 
+        sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null 
+      });
     }
-  async function fetchBcaRate() {
+
+    async function fetchBcaRate() {
       const html = await fetchText("https://www.bca.co.id/id/informasi/kurs");
       const doc = new DOMParser().parseFromString(html, "text/html");
       const text = normalizeSpace(doc.body ? doc.body.innerText : html);
@@ -579,7 +595,7 @@
     function finalizeBook(book) {
       if (!book) return { symbol: "-", bids: [], asks: [], bestBid: null, bestAsk: null, spread: null, error: "No data" };
       
-      // Data disimpan utuh tanpa dipotong .slice(0, 10) di sini agar kalkulator Taker bisa memproses kedalaman ratusan ribu USDT
+      // Data tetap dipertahankan mendalam agar simulator matematika berjalan presisi
       const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price);
       const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price);
       
@@ -662,6 +678,9 @@
       if (icon && text) { icon.textContent = isDark ? "☀️" : "🌙"; text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; }
     }
 
+    // =========================================================================
+    // RENDER UI DASHBOARD: KUNCI MATANG MAKSIMAL 10 BARIS UNTUK SELURUH BURSA
+    // =========================================================================
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
@@ -689,15 +708,18 @@
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        // JIKA BURSA REKU: Tampilkan apa adanya (As Is). BURSA LAIN: Potong rapi 10 baris ke tabel UI
-        const finalBids = config.key === "reku" ? (data.bids || []) : (data.bids || []).slice(0, 10);
-        const finalAsks = config.key === "reku" ? (data.asks || []) : (data.asks || []).slice(0, 10);
+        // PERBAIKAN: Seluruh bursa (termasuk Reku) dikunci ketat maksimal 10 baris ke visual UI tabel
+        const finalBids = (data.bids || []).slice(0, 10);
+        const finalAsks = (data.asks || []).slice(0, 10);
 
         setBookRows(`${config.key}-bids`, finalBids, "bid");
         setBookRows(`${config.key}-asks`, finalAsks, "ask");
       });
     }
 
+    // =========================================================================
+    // SIMULATOR: PROSES MENDALAM DENGAN EXACT NUMBER (VWAP VALUE)
+    // =========================================================================
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
@@ -733,7 +755,7 @@
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. TAKER (T) - PERHITUNGAN AKURAT SANGAT DALAM ---
+        // --- 2. TAKER (T) ---
         let totalCostIdr = 0; 
         let sizeAccumulated = 0; 
         let remainingSize = targetSize;
