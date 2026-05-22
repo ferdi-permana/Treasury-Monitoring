@@ -635,8 +635,8 @@
       if (icon && text) { icon.textContent = isDark ? "☀️" : "🌙"; text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; }
     }
 
-   // =========================================================================
-    // PERBAIKAN TOTAL SIMULATOR: ANTI-CRASH, BEBAS NaN, SCOPING VARIABEL AMAN
+  // =========================================================================
+    // 1. PERBAIKAN SIMULATOR: AMAN SCOPE & VARIABEL
     // =========================================================================
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
@@ -649,7 +649,6 @@
         pintu: { makerFee: 0.001311, takerFee: 0.001811 } 
       };
 
-      // Hanya iterasi bursa yang terdaftar di konfigurasi simulator (menghindari crash pada reku)
       Object.keys(ratesConfig).forEach((key) => {
         const data = state.exchanges[key]; 
         const config = ratesConfig[key];
@@ -659,15 +658,13 @@
         
         if (!mEl || !tEl) return;
         
-        // Proteksi Awal: Jika data corrupt atau kosong, langsung amankan layout dengan "Rp -" tanpa menghitung matematika
         if (!data || data.error || !Array.isArray(data.bids) || !data.bids.length || !Array.isArray(data.asks) || !data.asks.length || targetSize <= 0 || !config) { 
           mEl.textContent = "Rp -"; 
           tEl.textContent = "Rp -"; 
           return; 
         }
 
-        // --- 1. PERHITUNGAN MAKER (M) ---
-        // Proteksi penuh menggunakan optional chaining (?.) untuk mencegah error 'cannot read properties of undefined'
+        // MAKER (M)
         const bestBidPrice = data.bids?.[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
@@ -676,7 +673,7 @@
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. PERHITUNGAN TAKER (T) ---
+        // TAKER (T)
         let totalCostIdr = 0; 
         let remainingSize = targetSize;
         
@@ -691,7 +688,6 @@
           remainingSize -= takeQty;
         }
         
-        // Jika kapasitas Order Book habis tetapi pesanan simulasi masih bersisa
         if (remainingSize > 0) {
           const lastAskPrice = Number(data.asks[data.asks.length - 1]?.price || 0);
           if (lastAskPrice > 0) {
@@ -699,10 +695,12 @@
           }
         }
         
-        // Perbaikan Error Konsol: Variabel avgTakerBasePrice dideklarasikan di luar scope kondisi agar selalu valid
-        const avgTakerBasePrice = totalCostIdr / targetSize;
+        let avgTakerBasePrice = 0;
+        if (targetSize > 0) {
+          avgTakerBasePrice = totalCostIdr / targetSize;
+        }
         
-        if (!isNaN(avgTakerBasePrice) && isFinite(avgTakerBasePrice)) {
+        if (avgTakerBasePrice > 0 && !isNaN(avgTakerBasePrice) && isFinite(avgTakerBasePrice)) {
           const netTakerPrice = avgTakerBasePrice * (1 + config.takerFee);
           tEl.textContent = "Rp " + Math.round(netTakerPrice).toLocaleString("id-ID");
         } else {
@@ -711,6 +709,9 @@
       });
     }
 
+    // =========================================================================
+    // 2. PARSER & NORMALISASI: SANGAT AMAN DARI ARRAY KOSONG (ANTI-CRASH)
+    // =========================================================================
     function normalizeRekuSide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels.map((level) => {
@@ -742,6 +743,7 @@
       }).filter((l) => !isNaN(l.price) && !isNaN(l.qty) && isFinite(l.price) && isFinite(l.qty) && l.price > 0 && l.qty > 0);
     }
 
+    // MEMPERBAIKI BARIS 531: Diberikan pelindung optional chaining (?.) agar jika kosong tidak crash
     function finalizeBook(book) {
       const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price).slice(0, 10);
       const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price).slice(0, 10);
@@ -749,6 +751,40 @@
       const bestAsk = asks[0] || null;
       const spread = bestBid && bestAsk ? bestAsk.price - bestBid.price : null;
       return { ...book, bids, asks, bestBid, bestAsk, spread, error: null };
+    }
+
+    function renderExchanges() {
+      exchangeConfigs.forEach((config) => {
+        const data = state.exchanges[config.key];
+        
+        if (!data || data.error || !Array.isArray(data.bids) || !Array.isArray(data.asks)) {
+          setText(`${config.key}-total-bid-vol`, "-");
+          setText(`${config.key}-total-ask-vol`, "-");
+          setText(`${config.key}-spread`, "-");
+          const bidEl = document.getElementById(`${config.key}-bids`);
+          const askEl = document.getElementById(`${config.key}-asks`);
+          if (bidEl) bidEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          if (askEl) askEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          return;
+        }
+
+        const totalBidVolIdr = data.bids.reduce((acc, curr) => acc + ((Number(curr.price) || 0) * (Number(curr.qty) || 0)), 0);
+        const totalAskVolIdr = data.asks.reduce((acc, curr) => acc + ((Number(curr.price) || 0) * (Number(curr.qty) || 0)), 0);
+
+        const ringkasAngka = (num) => {
+          if (!num || isNaN(num) || !isFinite(num)) return "-";
+          if (num >= 1e9) return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
+          if (num >= 1e6) return (num / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt";
+          return num.toLocaleString("id-ID");
+        };
+
+        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
+        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
+        setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
+        
+        setBookRows(`${config.key}-bids`, data.bids, "bid");
+        setBookRows(`${config.key}-asks`, data.asks, "ask");
+      });
     }
 
     function setBookRows(id, levels, side) {
@@ -864,6 +900,7 @@
         text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
       }
     }
+  </script>
   </script>
   </script>
 </body>
