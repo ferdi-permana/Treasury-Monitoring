@@ -780,67 +780,17 @@
     }
 
     async function fetchTokocrypto() {
-     let book = null;
-      let errorFetch = null;
-
-      // STRATEGI 1: Mencoba endpoint utama v1 (Mendukung parameter limit kedalaman pasar)
-      try {
-        const response = await fetchRemote("https://api.tokocrypto.com/open/v1/market/depth?symbol=USDT_BIDR&limit=10", "application/json");
-        if (response.ok) {
-          const resJson = await response.json();
-          // Tokocrypto v1 biasanya membungkus data di dalam properti 'data'
-          book = resJson.data || resJson;
-        } else {
-          errorFetch = `HTTP ${response.status}`;
-        }
-      } catch (e) {
-        errorFetch = e.message;
-      }
-
-      // STRATEGI 2: FALLBACK - Jika endpoint v1 gagal/rate limit, tembak langsung endpoint Binance-mirror v3 mereka
-      if (!book || !book.bids) {
-        try {
-          const responseFallback = await fetchRemote("https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10", "application/json");
-          if (responseFallback.ok) {
-            book = await responseFallback.json();
-          } else {
-            throw new Error(`Fallback juga gagal: HTTP ${responseFallback.status}`);
-          }
-        } catch (fallbackError) {
-          throw new Error(`Tokocrypto API Error (${errorFetch} -> ${fallbackError.message})`);
-        }
-      }
-
-      // STRATEGI 3: Parsing Fleksibel (Mengantisipasi perubahan nama properti dari server)
-      const rawBids = book.bids || book.b || [];
-      const rawAsks = book.asks || book.a || book.s || [];
-
-      // Pembersihan dan normalisasi data array [price, qty] dari Tokocrypto
-      const bids = rawBids.slice(0, 10).map((level) => {
-        // Tokocrypto mengembalikan rate terhadap BIDR (1 USDT = ~16,100 BIDR). Kita konversi ke IDR murni (1 BIDR = 1 IDR)
-        const price = Number(level[0] || 0);
-        const qty = Number(level[1] || 0);
-        return { price, qty, notional: price * qty, side: "bid" };
-      }).filter((l) => l.price > 0 && l.qty > 0);
-
-      const asks = rawAsks.slice(0, 10).map((level) => {
-        const price = Number(level[0] || 0);
-        const qty = Number(level[1] || 0);
-        return { price, qty, notional: price * qty, side: "ask" };
-      }).filter((l) => l.price > 0 && l.qty > 0);
-
-      if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Data order book Tokocrypto kosong.");
-      }
-
+      const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=10";
+      const payload = await fetchJson(url);
+      const data = payload.data || payload;
+      const bids = normalizePriceQtySide(data.bids || [], "bid");
+      const asks = normalizePriceQtySide(data.asks || [], "ask");
       return finalizeBook({
-        symbol: "USDT_IDR",
-        bids,
-        asks,
-        fetchedAt: new Date(),
-        sourceUpdatedAt: null
+        symbol: "USDTIDR", bids, asks, fetchedAt: new Date(),
+        sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null
       });
     }
+
     async function fetchPintu() {
       const endpoints = [
         "https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR&depth=10",
