@@ -528,7 +528,7 @@
       </div>
 
       <div class="simulator-panel">
-        <div class="sim-header">USDT Buy Simulator (Net Rate Pasca Fee & Tax)</div>
+        <div class="sim-header">Simulasi beli USDT (Harga Bersih)</div>
         <div class="sim-row">
           <div class="sim-input-wrapper">
             <label for="calc-usdt-size">Ukuran Beli (USDT)</label>
@@ -557,7 +557,7 @@
             </div>
 
             <div class="sim-exchange-result">
-              <span class="sim-ex-title" style="color: #00a896;">Pintu Pro</span>
+              <span class="sim-ex-title" style="color: #00a896;">Pintu</span>
               <div class="sim-rate-row">
                 <span>Maker (M):</span> <span class="rate-val m" id="rate-m-pintu">Rp -</span>
               </div>
@@ -692,6 +692,7 @@
             const data = await config.fetcher();
             state.exchanges[config.key] = { ...data, key: config.key, name: config.name, error: null };
           } catch (error) {
+            console.error(`Error loading exchange ${config.key}:`, error);
             state.exchanges[config.key] = {
               key: config.key,
               name: config.name,
@@ -711,6 +712,7 @@
           try {
             state.bca = await fetchBcaRate();
           } catch (error) {
+            console.error("Error loading BCA rate:", error);
             state.bca = {
               buy: null,
               sell: null,
@@ -813,50 +815,34 @@
     }
 
     async function fetchReku() {
-      const response = await fetch("https://api.reku.id/v2/orderbook?symbol=USDT_IDR", {
-        cache: "no-store",
-        headers: {
-          "Accept": "application/json"
-        }
-      });
-      
+      const response = await fetchRemote("https://api.reku.id/v2/orderbook?symbol=USDT_IDR", "application/json");
       if (!response.ok) {
         throw new Error(`${response.status} ${response.statusText} dari api.reku.id`);
       }
       
       const book = await response.json();
-      
       const bids = normalizeRekuSide(book.bids || book.b || [], "bid");
       const asks = normalizeRekuSide(book.asks || book.s || [], "ask");
       
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Struktur data API Reku kosong atau format tidak sesuai.");
+        throw new Error("Struktur data API Reku kosong.");
       }
 
       return finalizeBook({
-        symbol: "USDT_IDR",
-        bids,
-        asks,
-        fetchedAt: new Date(),
-        sourceUpdatedAt: null,
-        sourceUpdatedAtText: "API Reku Pro tidak menyertakan timestamp order book",
-        note: "Reku Pro symbol: USDT_IDR"
+        symbol: "USDT_IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null
       });
     }
 
     async function fetchTokocrypto() {
       const targetUrl = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10";
-      const proxiedUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
       
-      // PERBAIKAN DI SINI: Ditambahkan parameter kedua {} (objek kosong) agar sesuai kebutuhan fungsi fetchWithTimeout bawaan
-      const response = await fetchWithTimeout(proxiedUrl, {});
+      // Request dialihkan lewat proxy internal web Anda secara aman
+      const response = await fetchRemote(targetUrl, "application/json");
       if (!response.ok) {
-        throw new Error(`Proxy Publik gagal mengambil data Tokocrypto (HTTP ${response.status})`);
+        throw new Error(`Gagal mengambil data Tokocrypto (HTTP ${response.status})`);
       }
       
-      const wrapper = await response.json();
-      const book = typeof wrapper.contents === "string" ? JSON.parse(wrapper.contents) : wrapper.contents;
-      
+      const book = await response.json();
       const rawBids = book.bids || [];
       const rawAsks = book.asks || [];
 
@@ -873,7 +859,7 @@
       }).filter((l) => isFinite(l.price) && l.qty > 0);
 
       if (bids.length === 0 && asks.length === 0) {
-        throw new Error("Struktur data dari proxy kosong.");
+        throw new Error("Struktur order book Tokocrypto kosong.");
       }
 
       return finalizeBook({ symbol: "USDT_BIDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null });
@@ -989,8 +975,7 @@
       const canUseProxy = location.protocol.startsWith("http");
       if (canUseProxy) {
         const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
-        const proxyResponse = await fetchWithTimeout(proxyUrl, { headers: { "Accept": accept } });
-        if (proxyResponse.ok || proxyResponse.status !== 404) return proxyResponse;
+        return fetchWithTimeout(proxyUrl, { headers: { "Accept": accept } });
       }
       return fetchWithTimeout(url, { headers: { "Accept": accept } });
     }
@@ -1135,8 +1120,9 @@
       return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
     }
 
+    // Perbaikan format uang agar tidak memunculkan RpNaN jika data macet
     function fmtIdr(value) {
-      if (value == null || !isFinite(value)) return "-";
+      if (value == null || !isFinite(value)) return "Rp -";
       return new Intl.NumberFormat("id-ID", {
         style: "currency", currency: "IDR", maximumFractionDigits: Math.abs(value) < 100 ? 2 : 0
       }).format(value);
