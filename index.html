@@ -444,8 +444,7 @@
       return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null });
     }
 
-    async function fetchTokocrypto() {
-  
+ async function fetchTokocrypto() {
       const response = await fetchRemote("https://cloudme-toko.2meta.app/api/v3/depth?symbol=USDTBIDR&limit=10", "application/json");
       if (!response.ok) throw new Error(`HTTP ${response.status} dari Tokocrypto`);
       const book = await response.json();
@@ -527,8 +526,9 @@
       try { return await fetch(url, { ...options, cache: "no-store", signal: controller.signal }); } finally { clearTimeout(timeout); }
     }
 
-     function normalizeRekuSide(levels, side) {
-      if (!Array.isArray(levels)) return [];
+    function normalizeRekuSide(levels, side) {
+      if (!levels || !Array.isArray(levels)) return [];
+      
       return levels.map((level) => {
         let price = 0, qty = 0;
         
@@ -539,14 +539,13 @@
           if (level.length === 3) {
             price = Number(level[1] || 0); 
             qty = Number(level[2] || 0); 
-          } else {
+          } else if (level.length >= 2) {
             price = Number(level[0] || 0); 
             qty = Number(level[1] || 0);
           }
         }
-        
         return { price, qty, notional: price * qty, side };
-      }).filter((level) => isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
+      }).filter((level) => !isNaN(level.price) && !isNaN(level.qty) && isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
     function normalizePriceQtySide(levels, side) {
       if (!Array.isArray(levels)) return [];
@@ -556,14 +555,18 @@
       }).filter((l) => isFinite(l.price) && isFinite(l.qty) && l.price > 0 && l.qty > 0);
     }
 
-    function finalizeBook(book) {
-      const bids = [...book.bids].sort((a, b) => b.price - a.price).slice(0, 10);
-      const asks = [...book.asks].sort((a, b) => a.price - b.price).slice(0, 10);
-      const bestBid = bids[0] || null; const bestAsk = asks[0] || null;
-      const spread = bestBid && bestAsk ? bestAsk.price - bestBid.price : null;
+   function finalizeBook(book) {
+      if (!book) return { symbol: "-", bids: [], asks: [], bestBid: null, bestAsk: null, spread: null, error: "No data" };
+      
+      const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price).slice(0, 10);
+      const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price).slice(0, 10);
+      
+      const bestBid = bids[0] ? bids[0].price : null; 
+      const bestAsk = asks[0] ? asks[0].price : null;
+      const spread = (bestBid && bestAsk) ? (bestAsk - bestBid) : null;
+      
       return { ...book, bids, asks, bestBid, bestAsk, spread, error: null };
     }
-
     function setBookRows(id, levels, side) {
       const tbody = document.getElementById(id);
       if (!tbody) return;
