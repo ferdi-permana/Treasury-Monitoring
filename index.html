@@ -801,15 +801,16 @@ async function fetchTokocrypto() {
       });
     }
 
-    // =========================================================================
-    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING KE ATAS (MATH.CEIL)
+   // =========================================================================
+    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING KE ATAS (AUTO-CALCULATE)
     // =========================================================================
     function calculateSimulatedRates() {
+      // Mengambil elemen secara presisi dari objek els atau fallback ke DOM jika belum terikat
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
       const targetSize = parseFloat(sizeInput.value) || 0;
       
-      // Penguncian Fee & Pajak Pintu Pro (M: 0.1311% | T: 0.1811%) sesuai instruksi Anda
+      // Sinkronisasi Fee & Pajak Pintu Pro (M: 0.1311% | T: 0.1811%)
       const ratesConfig = { 
         indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
         tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
@@ -835,7 +836,6 @@ async function fetchTokocrypto() {
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
-          // Math.ceil() memastikan desimal sekecil apa pun dibulatkan ke atas
           mEl.textContent = "Rp " + Math.ceil(netMakerPrice).toLocaleString("id-ID");
         } else {
           mEl.textContent = "Rp -";
@@ -845,29 +845,37 @@ async function fetchTokocrypto() {
         let remainingSize = targetSize;
         let lastHitPrice = 0;
         
-        // Menyisir antrean ask dari harga termurah hingga volume pesanan habis
         for (const order of data.asks) {
           const price = Number(order.price || 0);
           const qty = Number(order.qty || 0);
           if (price <= 0 || qty <= 0) continue;
 
-          lastHitPrice = price; // Mencatat harga eksekusi berjalan
+          lastHitPrice = price; 
           remainingSize -= qty;
           
           if (remainingSize <= 0) {
-            break; // Berhenti seketika saat volume target terpenuhi
+            break; 
           }
         }
         
         if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
           const netTakerPrice = lastHitPrice * (1 + config.takerFee);
-          // Math.ceil() menjamin Exact Number bulat ke atas tanpa toleransi pecahan
           tEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
         }
       });
     }
+
+    // Mengunci deteksi ketikan instan (Event Listener) saat dokumen selesai dimuat
+    document.addEventListener("DOMContentLoaded", () => {
+      const inputEl = document.getElementById("calc-usdt-size");
+      if (inputEl) {
+        inputEl.addEventListener("input", calculateSimulatedRates);
+        inputEl.addEventListener("change", calculateSimulatedRates);
+      }
+    });
   </script>
+  
 </body>
 </html>
