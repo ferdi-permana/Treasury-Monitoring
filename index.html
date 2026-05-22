@@ -716,13 +716,14 @@ async function fetchTokocrypto() {
     }
 
     // =========================================================================
-    // SIMULATOR TAKER: LOGIKA MATEMATIKA BERDASARKAN LAST HIT PRICE (EXACT NUMBER)
+    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING DIPAKSA KE ATAS (MATH.CEIL)
     // =========================================================================
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
       const targetSize = parseFloat(sizeInput.value) || 0;
       
+      // Mengunci nilai fee Pintu Pro sesuai rincian gambar: Maker 0.1311% dan Taker 0.1811%
       const ratesConfig = { 
         indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
         tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
@@ -744,47 +745,38 @@ async function fetchTokocrypto() {
           return; 
         }
 
-        // --- 1. PERHITUNGAN MAKER (M) ---
-        // Maker mengeksekusi harga terbaik di Bid Teratas (Best Bid)
+        // --- 1. PERHITUNGAN MAKER (M) DENGAN PADA ROUNDING KE ATAS ---
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
-          mEl.textContent = "Rp " + Math.round(netMakerPrice).toLocaleString("id-ID");
+          // Menggunakan Math.ceil() untuk memastikan pembulatan selalu dipaksa ke atas
+          mEl.textContent = "Rp " + Math.ceil(netMakerPrice).toLocaleString("id-ID");
         } else {
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. PERHITUNGAN TAKER (T) - LOGIKA LAST HIT PRICE ---
+        // --- 2. PERHITUNGAN TAKER (T) LOGIKA LAST HIT PRICE & ROUNDING KE ATAS ---
         let remainingSize = targetSize;
         let lastHitPrice = 0;
         
-        // Telusuri antrean ask dari harga terendah ke tertinggi
         for (const order of data.asks) {
           const price = Number(order.price || 0);
           const qty = Number(order.qty || 0);
           if (price <= 0 || qty <= 0) continue;
 
-          // Catat harga saat ini sebagai harga eksekusi terakhir
           lastHitPrice = price;
-          
-          // Kurangi sisa pesanan dengan volume yang tersedia di baris ini
           remainingSize -= qty;
           
-          // Jika sisa ukuran beli sudah habis (<= 0), hentikan pencarian karena harga target sudah ketemu
           if (remainingSize <= 0) {
             break;
           }
         }
         
-        // Pengaman: Jika ukuran pesanan raksasa melebihi total seluruh baris order book di API,
-        // maka lastHitPrice akan otomatis menggunakan harga baris paling terakhir (termahal) yang tersedia.
-        
         if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
-          // Basis perhitungan langsung menggunakan Last Hit Price + Fee & Tax
           const netTakerPrice = lastHitPrice * (1 + config.takerFee);
           
-          // Cetak EXACT NUMBER bulat bersih tanpa pecahan desimal belakang koma
-          tEl.textContent = "Rp " + Math.round(netTakerPrice).toLocaleString("id-ID");
+          // Menggunakan Math.ceil() untuk memastikan hasil taker selalu dibulatkan ke atas (Exact Number)
+          tEl.textContent = "Rp " + Math.ceil(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
         }
