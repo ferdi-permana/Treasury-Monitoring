@@ -9,6 +9,7 @@ const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
   "cloudme-toko.2meta.app",
+  "api.tokocrypto.com", // <-- Ditambahkan agar diizinkan oleh proxy
   "indodax.com",
   "api.pintu.pro",
   "api.pintupro.com",
@@ -36,20 +37,18 @@ const server = createServer(async (req, res) => {
     const filePath = resolve(join(root, relativePath));
 
     if (!filePath.startsWith(root)) {
-      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(403, { "Content-Type": "text/plain" });
       res.end("Forbidden");
       return;
     }
 
-    const body = await readFile(filePath);
-    res.writeHead(200, {
-      "Content-Type": types[extname(filePath)] || "application/octet-stream",
-      "Cache-Control": "no-store"
-    });
-    res.end(body);
-  } catch {
-    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Not found");
+    const content = await readFile(filePath);
+    const ext = extname(filePath);
+    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+    res.end(content);
+  } catch (error) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Not Found");
   }
 });
 
@@ -88,12 +87,12 @@ async function proxyRequest(url, res) {
     res.end(body);
   } catch (error) {
     res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ error: error.name === "AbortError" ? "Proxy timeout" : error.message }));
+    res.end(JSON.stringify({ error: error.name === "AbortError" ? "Proxy timeout" : "Upstream fetch failed" }));
   } finally {
     clearTimeout(timeout);
   }
 }
 
-server.listen(port, host, () => {
-  console.log(`Treasury dashboard: http://${host}:${port}/`);
+server.listen(port, () => {
+  console.log(`Server running at http://${host}:${port}/`);
 });
