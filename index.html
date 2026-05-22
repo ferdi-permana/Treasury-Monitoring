@@ -478,22 +478,22 @@
       });
     }
     async function fetchIndodax() {
-     const response = await fetchRemote("https://indodax.com/api/v2/depth/usd_idr", "application/json");
-      if (!response.ok) throw new Error(`HTTP ${response.status} dari Indodax`);
-      const book = await response.json();
-      const bids = normalizePriceQtySide(book.bids || [], "bid");
-      const asks = normalizePriceQtySide(book.asks || [], "ask");
-      return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: null });
+     const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
+      const bids = normalizePriceQtySide(book.buy || book.bids || [], "bid");
+      const asks = normalizePriceQtySide(book.sell || book.asks || [], "ask");
+      let ticker = null;
+      try { ticker = await fetchJsonWithCandidates(["https://indodax.com/api/ticker/usdtidr", "https://indodax.com/api/ticker/usdt_idr"]); } catch (e) {}
+      const serverTime = Number(ticker?.ticker?.server_time || ticker?.server_time);
+      return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: serverTime ? new Date(serverTime * 1000) : null });
     }
     async function fetchPintu() {
-      const payload = await fetchJsonWithCandidates(["https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR&depth=100", "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR&depth=100"]);
+      const payload = await fetchJsonWithCandidates(["https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR", "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR"]);
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
       return finalizeBook({ symbol: data.symbol || "USDT-IDR", bids, asks, fetchedAt: new Date(), sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null });
     }
-
-    async function fetchBcaRate() {
+  async function fetchBcaRate() {
       const html = await fetchText("https://www.bca.co.id/id/informasi/kurs");
       const doc = new DOMParser().parseFromString(html, "text/html");
       const text = normalizeSpace(doc.body ? doc.body.innerText : html);
@@ -550,10 +550,8 @@
 
     function normalizeRekuSide(levels, side) {
       if (!levels || !Array.isArray(levels)) return [];
-      
       return levels.map((level) => {
         let price = 0, qty = 0;
-        
         if (level && typeof level === "object" && !Array.isArray(level)) {
           price = Number(level.price || level.p || 0); 
           qty = Number(level.volume || level.qty || level.v || 0);
@@ -569,6 +567,7 @@
         return { price, qty, notional: price * qty, side };
       }).filter((level) => !isNaN(level.price) && !isNaN(level.qty) && isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
     }
+
     function normalizePriceQtySide(levels, side) {
       if (!Array.isArray(levels)) return [];
       return levels.map((level) => {
@@ -577,11 +576,12 @@
       }).filter((l) => isFinite(l.price) && isFinite(l.qty) && l.price > 0 && l.qty > 0);
     }
 
-   function finalizeBook(book) {
+    function finalizeBook(book) {
       if (!book) return { symbol: "-", bids: [], asks: [], bestBid: null, bestAsk: null, spread: null, error: "No data" };
       
-      const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price).slice(0, 10);
-      const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price).slice(0, 10);
+      // Data disimpan utuh tanpa dipotong .slice(0, 10) di sini agar kalkulator Taker bisa memproses kedalaman ratusan ribu USDT
+      const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price);
+      const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price);
       
       const bestBid = bids[0] ? bids[0].price : null; 
       const bestAsk = asks[0] ? asks[0].price : null;
@@ -589,6 +589,7 @@
       
       return { ...book, bids, asks, bestBid, bestAsk, spread, error: null };
     }
+
     function setBookRows(id, levels, side) {
       const tbody = document.getElementById(id);
       if (!tbody) return;
@@ -639,6 +640,7 @@
     }
     function formatDateTime(v) { return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(v)); }
     function formatTime(v) { return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(v)); }
+    
     function parseLocaleNumber(v) {
       const t = String(v).trim();
       if (t.includes(".") && t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
@@ -660,9 +662,42 @@
       if (icon && text) { icon.textContent = isDark ? "☀️" : "🌙"; text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; }
     }
 
-   // =========================================================================
-    // SIMULATOR DATA PENUH & RENDERING TAMPILAN UI STRIP MAX 10 BARIS
-    // =========================================================================
+    function renderExchanges() {
+      exchangeConfigs.forEach((config) => {
+        const data = state.exchanges[config.key];
+        
+        if (!data || data.error) {
+          setText(`${config.key}-total-bid-vol`, "-");
+          setText(`${config.key}-total-ask-vol`, "-");
+          setText(`${config.key}-spread`, "-");
+          document.getElementById(`${config.key}-bids`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          document.getElementById(`${config.key}-asks`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          return;
+        }
+
+        const totalBidVolIdr = (data.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalAskVolIdr = (data.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+
+        const ringkasAngka = (num) => {
+          if (!num || isNaN(num)) return "-";
+          if (num >= 1e9) return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
+          if (num >= 1e6) return (num / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt";
+          return num.toLocaleString("id-ID");
+        };
+
+        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
+        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
+        setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
+        
+        // JIKA BURSA REKU: Tampilkan apa adanya (As Is). BURSA LAIN: Potong rapi 10 baris ke tabel UI
+        const finalBids = config.key === "reku" ? (data.bids || []) : (data.bids || []).slice(0, 10);
+        const finalAsks = config.key === "reku" ? (data.asks || []) : (data.asks || []).slice(0, 10);
+
+        setBookRows(`${config.key}-bids`, finalBids, "bid");
+        setBookRows(`${config.key}-asks`, finalAsks, "ask");
+      });
+    }
+
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
@@ -689,7 +724,7 @@
           return; 
         }
 
-        // --- 1. PERHITUNGAN MAKER (M) ---
+        // --- 1. MAKER (M) ---
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
@@ -698,12 +733,11 @@
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. PERHITUNGAN TAKER (T) - EXACT NUMBER & AKURASI MATEMATIKA ---
+        // --- 2. TAKER (T) - PERHITUNGAN AKURAT SANGAT DALAM ---
         let totalCostIdr = 0; 
         let sizeAccumulated = 0; 
         let remainingSize = targetSize;
         
-        // Membaca baris likuiditas penuh yang ditarik dari API
         for (const order of data.asks) {
           if (remainingSize <= 0) break;
           const price = Number(order.price || 0);
@@ -716,7 +750,6 @@
           remainingSize -= takeQty;
         }
         
-        // Pengaman jika volume yang dicari lebih besar dari data API yang tersedia
         if (remainingSize > 0) {
           const lastAskPrice = Number(data.asks[data.asks.length - 1]?.price || 0);
           if (lastAskPrice > 0) {
@@ -729,210 +762,11 @@
         
         if (avgTakerBasePrice > 0 && !isNaN(avgTakerBasePrice) && isFinite(avgTakerBasePrice)) {
           const netTakerPrice = avgTakerBasePrice * (1 + config.takerFee);
-          // Menampilkan Exact Number bulat tanpa pecahan desimal sesuai keinginan Anda
           tEl.textContent = "Rp " + Math.round(netTakerPrice).toLocaleString("id-ID");
         } else {
           tEl.textContent = "Rp -";
         }
       });
-    }
-
-    // =========================================================================
-    // PARSER & FILTER SINKRONISASI DATA (REKU AS IS)
-    // =========================================================================
-    function normalizeRekuSide(levels, side) {
-      if (!levels || !Array.isArray(levels)) return [];
-      return levels.map((level) => {
-        let price = 0, qty = 0;
-        if (level && typeof level === "object" && !Array.isArray(level)) {
-          price = Number(level.price || level.p || 0); 
-          qty = Number(level.volume || level.qty || level.v || 0);
-        } else if (Array.isArray(level)) {
-          if (level.length === 3) {
-            price = Number(level[1] || 0); 
-            qty = Number(level[2] || 0); 
-          } else if (level.length >= 2) {
-            price = Number(level[0] || 0); 
-            qty = Number(level[1] || 0);
-          }
-        }
-        return { price, qty, notional: price * qty, side };
-      }).filter((level) => !isNaN(level.price) && !isNaN(level.qty) && isFinite(level.price) && isFinite(level.qty) && level.price > 0 && level.qty > 0);
-    }
-    
-    function normalizePriceQtySide(levels, side) {
-      if (!Array.isArray(levels)) return [];
-      return levels.map((level) => {
-        if (!level || !Array.isArray(level) || level.length < 2) return { price: 0, qty: 0, notional: 0, side };
-        const price = Number(level[0] || 0); 
-        const qty = Number(level[1] || 0);
-        return { price, qty, notional: price * qty, side };
-      }).filter((l) => !isNaN(l.price) && !isNaN(l.qty) && isFinite(l.price) && isFinite(l.qty) && l.price > 0 && l.qty > 0);
-    }
-
-    function finalizeBook(book) {
-      if (!book) return { symbol: "-", bids: [], asks: [], bestBid: null, bestAsk: null, spread: null, error: "No data" };
-      
-      const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price);
-      const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price);
-      
-      const bestBid = bids[0] ? bids[0].price : null; 
-      const bestAsk = asks[0] ? asks[0].price : null;
-      const spread = (bestBid && bestAsk) ? (bestAsk - bestBid) : null;
-      return { ...book, bids, asks, bestBid, bestAsk, spread, error: null };
-    }
-
-    function renderExchanges() {
-      exchangeConfigs.forEach((config) => {
-        const data = state.exchanges[config.key];
-        
-        if (!data || data.error || !Array.isArray(data.bids) || !Array.isArray(data.asks)) {
-          setText(`${config.key}-total-bid-vol`, "-");
-          setText(`${config.key}-total-ask-vol`, "-");
-          setText(`${config.key}-spread`, "-");
-          const bidEl = document.getElementById(`${config.key}-bids`);
-          const askEl = document.getElementById(`${config.key}-asks`);
-          if (bidEl) bidEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          if (askEl) askEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          return;
-        }
-
-        const totalBidVolIdr = data.bids.reduce((acc, curr) => acc + ((Number(curr.price) || 0) * (Number(curr.qty) || 0)), 0);
-        const totalAskVolIdr = data.asks.reduce((acc, curr) => acc + ((Number(curr.price) || 0) * (Number(curr.qty) || 0)), 0);
-
-        const ringkasAngka = (num) => {
-          if (!num || isNaN(num) || !isFinite(num)) return "-";
-          if (num >= 1e9) return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
-          if (num >= 1e6) return (num / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt";
-          return num.toLocaleString("id-ID");
-        };
-
-        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
-        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
-        setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
-        
-        // Membatasi visual tabel di UI agar selalu rapi maksimal 10 baris teratas saja
-        const partialBids = data.bids.slice(0, 10);
-        const partialAsks = data.asks.slice(0, 10);
-        
-        setBookRows(`${config.key}-bids`, partialBids, "bid");
-        setBookRows(`${config.key}-asks`, partialAsks, "ask");
-      });
-    }
-
-    function setBookRows(id, levels, side) {
-      const tbody = document.getElementById(id);
-      if (!tbody) return;
-      if (!levels || !levels.length) { 
-        tbody.innerHTML = `<tr><td colspan="4">-</td></tr>`; 
-        return; 
-      }
-      const displayLevels = side === "ask" ? [...levels].reverse() : levels;
-      tbody.innerHTML = displayLevels.map((level, index) => {
-        const rowNumber = side === "ask" ? (displayLevels.length - index) : (index + 1);
-        return `<tr><td>${rowNumber}</td><td>${fmtIdr(level.price).replace("Rp", "").trim()}</td><td>${fmtNumber(level.qty)}</td><td>${Math.round(level.price * level.qty).toLocaleString("id-ID")}</td></tr>`;
-      }).join("");
-    }
-    
-    function getSourceStatus(source, isBca = false) {
-      if (!source) return { kind: "delayed", text: "Waiting" };
-      if (source.error) return { kind: "error", text: "Error Data" };
-      const fetchedAgeSeconds = (Date.now() - new Date(source.fetchedAt).getTime()) / 1000;
-      if (isBca) return { kind: "fresh", text: "BCA Live" };
-      if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
-      if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
-      return { kind: "error", text: "Expired" };
-    }
-
-    // --- SISA UTILITY FUNCTIONS KODE ASLI DIBAWAH TETAP DIPERTAHANKAN ---
-    function formatCountdown(seconds) {
-      const s = Math.max(0, Number(seconds) || 0);
-      return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
-    }
-    
-    function setCycleStatus(kind, text) { 
-      updateStatusPill(els.cycleStatus, kind, text); 
-    }
-    
-    function updateStatusPill(pill, kind, text) {
-      if (!pill) return;
-      pill.className = `pill ${kind}`;
-      const dot = pill.querySelector(".status-dot");
-      if (dot) dot.className = `status-dot ${kind}`;
-      const label = pill.querySelector("span:last-child");
-      if (label) label.textContent = text;
-    }
-    
-    function latestText(source) { 
-      return source && !source.error && source.fetchedAt ? formatTime(source.fetchedAt) : "-"; 
-    }
-    
-    function relativeAge(dateValue) {
-      const s = Math.max(0, Math.floor((Date.now() - new Date(dateValue).getTime()) / 1000));
-      if (s < 60) return `${s}s`;
-      return `${Math.floor(s / 60)}m ${s % 60}s`;
-    }
-    
-    function fmtIdr(value) {
-      if (value == null || !isFinite(value) || isNaN(value)) return "Rp -";
-      return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: Math.abs(value) < 100 ? 2 : 0 }).format(value);
-    }
-    
-    function fmtNumber(value) {
-      if (value == null || !isFinite(value) || isNaN(value)) return "-";
-      return new Intl.NumberFormat("id-ID", { maximumFractionDigits: value < 1 ? 6 : 2 }).format(value);
-    }
-    
-    function formatDateTime(v) { 
-      return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(v)); 
-    }
-    
-    function formatTime(v) { 
-      return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(v)); 
-    }
-    
-    function parseLocaleNumber(v) {
-      if (typeof v === "number") return v;
-      const t = String(v || "").trim().replace(/[^\d.,-]/g, "");
-      if (t.includes(".") && t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
-      if (t.includes(",")) {
-        if (t.indexOf(",") < t.lastIndexOf(",")) return Number(t.replace(/,/g, ""));
-        const parts = t.split(",");
-        if (parts[1].length === 2 || parts[1].length === 1) return Number(t.replace(/\./g, "").replace(",", "."));
-        return Number(t.replace(/,/g, ""));
-      }
-      return Number(t);
-    }
-    
-    function normalizeSpace(text) { 
-      return String(text || "").replace(/\s+/g, " ").trim(); 
-    }
-    
-    function setText(id, text) { 
-      const el = document.getElementById(id); 
-      if (el) el.textContent = text; 
-    }
-
-    function initTheme() { 
-      if ((localStorage.getItem("theme") || "light") === "dark") { 
-        document.documentElement.setAttribute("data-theme", "dark"); 
-        updateThemeUI(true); 
-      } 
-    }
-    
-    function toggleTheme() {
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-      document.documentElement.toggleAttribute("data-theme", !isDark);
-      localStorage.setItem("theme", isDark ? "light" : "dark");
-      updateThemeUI(!isDark);
-    }
-    
-    function updateThemeUI(isDark) {
-      const icon = document.getElementById("theme-icon"), text = document.getElementById("theme-text");
-      if (icon && text) { 
-        icon.textContent = isDark ? "☀️" : "🌙"; 
-        text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
-      }
     }
   </script>
 </body>
