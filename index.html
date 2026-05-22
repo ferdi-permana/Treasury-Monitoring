@@ -457,7 +457,6 @@
       font-weight: 500;
     }
 
-    /* BAGIAN STATUS SUMBER / DATA SOURCES AGES DI BAWAH WEB */
     .source-grid {
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       margin-top: 32px;
@@ -529,7 +528,7 @@
       </div>
 
       <div class="simulator-panel">
-        <div class="sim-header">USDT Buy Simulator (Net Rate Pasca Fee & Tax)</div>
+        <div class="sim-header">Simulator beli USDT (Harga Bersih)</div>
         <div class="sim-row">
           <div class="sim-input-wrapper">
             <label for="calc-usdt-size">Ukuran Beli (USDT)</label>
@@ -847,10 +846,10 @@
 
     async function fetchTokocrypto() {
       const targetUrl = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTBIDR&limit=10";
-      
       const proxiedUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
       
-      const response = await fetchWithTimeout(proxiedUrl);
+      // PERBAIKAN DI SINI: Ditambahkan parameter kedua {} (objek kosong) agar sesuai kebutuhan fungsi fetchWithTimeout bawaan
+      const response = await fetchWithTimeout(proxiedUrl, {});
       if (!response.ok) {
         throw new Error(`Proxy Publik gagal mengambil data Tokocrypto (HTTP ${response.status})`);
       }
@@ -1166,7 +1165,6 @@
     function normalizeSpace(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
     function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 
-    /* LOGIKA SAKLAR SWAP TEMA (DARK MODE) */
     function initTheme() {
       const savedTheme = localStorage.getItem("theme") || "light";
       if (savedTheme === "dark") {
@@ -1199,7 +1197,6 @@
       }
     }
 
-    // FUNGSI LOGIKA MESIN SIMULATOR HITUNG REALTIME
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
@@ -1227,12 +1224,10 @@
           return;
         }
 
-        // MAKER (M)
         const bestBidPrice = data.bids[0].price;
         const netMakerPrice = bestBidPrice * (1 + config.makerFee);
         mEl.textContent = "Rp " + Math.round(netMakerPrice).toLocaleString("id-ID");
 
-        // TAKER (T)
         let totalCostIdr = 0;
         let remainingSize = targetSize;
         
