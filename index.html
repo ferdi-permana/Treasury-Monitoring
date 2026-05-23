@@ -467,30 +467,16 @@
       });
     }
 async function fetchTokocrypto() {
-      // Menggunakan endpoint API resmi yang lolos dari pemblokiran proxy biasa
-      const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+      const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=100";
       const payload = await fetchJson(url);
-      
-      // Fallback deteksi data jika dibungkus payload.data ataupun objek langsung
-      const data = payload && payload.bids ? payload : (payload.data || payload || {});
-      
+      const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
       const asks = normalizePriceQtySide(data.asks || [], "ask");
-      
-      // Amankan ekstraksi waktu server agar tidak menghasilkan Uncaught TypeError NaN
-      let validDate = null;
-      if (payload && payload.timestamp) validDate = new Date(Number(payload.timestamp));
-      else if (data && data.timestamp) validDate = new Date(Number(data.timestamp));
-      
       return finalizeBook({
-        symbol: "USDTIDR", 
-        bids, 
-        asks, 
-        fetchedAt: new Date(),
-        sourceUpdatedAt: (validDate && !isNaN(validDate)) ? validDate : null
+        symbol: "USDTIDR", bids, asks, fetchedAt: new Date(),
+        sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null
       });
     }
-
     async function fetchIndodax() {
       // Mengambil data order book penuh dari API Indodax lewat proxy
       const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
