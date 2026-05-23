@@ -616,15 +616,33 @@ async function fetchTokocrypto() {
     }
     
     function getSourceStatus(source, isBca = false) {
-      if (!source) return { kind: "delayed", text: "Waiting" };
-      if (source.error) return { kind: "error", text: "Error Data" };
+      if (!source) return { kind: "delayed", text: "Menunggu" };
+      if (source.error) return { kind: "error", text: "Data Eror" };
+      
       const fetchedAgeSeconds = (Date.now() - new Date(source.fetchedAt).getTime()) / 1000;
-      if (isBca) return { kind: "fresh", text: "BCA Live" };
+      
+      // Logika khusus pemeriksaan jam kerja e-Rate BCA (Senin-Jumat, 08:00 - 16:00 WIB)
+      if (isBca) {
+        // Mengonversi waktu saat ini ke zona waktu Asia/Jakarta (WIB)
+        const jktDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+        const day = jktDate.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+        const hour = jktDate.getHours();
+        
+        const isWeekday = day >= 1 && day <= 5;
+        const isWorkingHours = hour >= 8 && hour < 16;
+        
+        if (isWeekday && isWorkingHours) {
+          return { kind: "fresh", text: "BCA Live" };
+        } else {
+          // Menggunakan status delayed (kuning) saat bank sudah tutup / libur
+          return { kind: "delayed", text: "BCA Tutup" };
+        }
+      }
+      
       if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
-      if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Delayed" };
-      return { kind: "error", text: "Expired" };
+      if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Terlambat" };
+      return { kind: "error", text: "Kadaluwarsa" };
     }
-
     function formatCountdown(seconds) {
       const s = Math.max(0, Number(seconds) || 0);
       return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
