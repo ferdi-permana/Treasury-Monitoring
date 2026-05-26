@@ -387,9 +387,21 @@
           return;
         }
 
-        const finalBids = (data.bids || []).slice(0, 10);
-        const finalAsks = (data.asks || []).slice(0, 10);
+        // DEKLARASI VARIABEL UNTUK MENAMPUNG 10 BARIS VISUAL
+        let finalBids = [];
+        let finalAsks = [];
 
+        // LOGIKA PEMISAH: Jika bursa adalah reku, ambil semua karena backend-nya sudah pas 10 baris.
+        // Jika bursa adalah indodax, tokocrypto, atau pintu, potong ketat hanya 10 baris teratas.
+        if (config.key === "reku") {
+          finalBids = data.bids || [];
+          finalAsks = data.asks || [];
+        } else {
+          finalBids = (data.bids || []).slice(0, 10);
+          finalAsks = (data.asks || []).slice(0, 10);
+        }
+
+        // HITUNG TOTAL VOLUME IDR MURNI DARI DATA YANG SUDAH DIPASTIKAN 10 BARIS DI ATAS
         const totalBidVolIdr = finalBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
         const totalAskVolIdr = finalAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
@@ -404,6 +416,7 @@
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
+        // Render baris fisik ke dalam tabel HTML dashboard
         setBookRows(`${config.key}-bids`, finalBids, "bid");
         setBookRows(`${config.key}-asks`, finalAsks, "ask");
       });
