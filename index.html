@@ -371,7 +371,7 @@
       calculateSimulatedRates();
     }
 
-    function renderExchanges() {
+   function renderExchanges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
         
@@ -387,13 +387,12 @@
           return;
         }
 
-        // Kunci semua visual bursa (termasuk Reku) ketat hanya 10 baris teratas saja
-        const visualBids = (data.bids || []).slice(0, 10);
-        const visualAsks = (data.asks || []).slice(0, 10);
+        const finalBids = (data.bids || []).slice(0, 10);
+        const finalAsks = (data.asks || []).slice(0, 10);
 
-        // Hitung total volume IDR hanya berdasarkan 10 baris visual yang tampil di layar
-        const totalBidVolIdr = visualBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        const totalAskVolIdr = visualAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        // Menghitung volume IDR murni hanya dari 10 baris teratas yang tampil di layar
+        const totalBidVolIdr = finalBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalAskVolIdr = finalAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
         const ringkasAngka = (num) => {
           if (!num || isNaN(num)) return "-";
@@ -402,15 +401,15 @@
           return num.toLocaleString("id-ID");
         };
 
-        // Tampilkan hasil ke UI Dashboard
         setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        setBookRows(`${config.key}-bids`, visualBids, "bid");
-        setBookRows(`${config.key}-asks`, visualAsks, "ask");
+        setBookRows(`${config.key}-bids`, finalBids, "bid");
+        setBookRows(`${config.key}-asks`, finalAsks, "ask");
       });
     }
+    
     function renderBca() {
       const bca = state.bca;
       const status = getSourceStatus(bca);
