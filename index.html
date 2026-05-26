@@ -104,11 +104,11 @@
     #card-tokocrypto { border-top: 4px solid #087f5b; }
     #card-pintu { border-top: 4px solid #00a896; }
     .exchange-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
-    .exchange-stats { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface-2); border-bottom: 1px solid var(--line); }
-    .stat { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; text-align: center; width: 100%; }
+    .exchange-stats { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface-2); border-bottom: 1px solid var(--line); align-items: center; justify-items: center; }
+    .stat { padding: 14px 8px; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; text-align: center; width: 100%;}
     .stat:not(:last-child) { border-right: 1px solid var(--line); }
-    .stat .small { font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em; }
-    .stat strong { font-size: 14px; font-weight: 800; display: block; width: 100%; text-align: center; }
+    .stat .small { font-size: 12x; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; line-height: 1;}
+    .stat strong { font-size: 14px; font-weight: 800; color: var(--ink); line-height: 1; display: block;}
     .book-tables { display: flex; flex-direction: column; flex: 1; }
     .book-side { flex: 1; }
     .book-side:first-child { border-bottom: 1px solid var(--line); }
@@ -116,7 +116,7 @@
     .side-title.buy { background: var(--buy-bg); color: var(--buy); }
     .side-title.sell { background: var(--sell-bg); color: var(--sell); }
     .exchange-card table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .exchange-card th { padding: 8px 12px; font-weight: 700; color: var(--muted); text-align: right; border-bottom: 1px solid var(--line); background: var(--bg); font-size: 13px; } 
+    .exchange-card th { padding: 8px 12px; font-weight: 700; color: var(--muted); text-align: right; border-bottom: 1px solid var(--line); background: var(--bg); font-size: 12px; } 
     .exchange-card th:first-child { text-align: center; width: 35px; }
     .exchange-card td { padding: 7px 12px; text-align: right; border-bottom: 1px solid rgba(0,0,0,0.03); font-variant-numeric: tabular-nums; line-height: 1.2; } 
     .exchange-card td:first-child { color: var(--muted); text-align: center; font-weight: 600; }
