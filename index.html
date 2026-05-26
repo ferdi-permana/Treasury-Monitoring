@@ -379,13 +379,19 @@
           setText(`${config.key}-total-bid-vol`, "-");
           setText(`${config.key}-total-ask-vol`, "-");
           setText(`${config.key}-spread`, "-");
-          document.getElementById(`${config.key}-bids`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          document.getElementById(`${config.key}-asks`).innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          
+          const bEl = document.getElementById(`${config.key}-bids`);
+          const aEl = document.getElementById(`${config.key}-asks`);
+          if (bEl) bEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
+          if (aEl) aEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
           return;
         }
+        
+        const finalBids = (data.bids || []).slice(0, 10);
+        const finalAsks = (data.asks || []).slice(0, 10);
 
-        const totalBidVolIdr = (data.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        const totalAskVolIdr = (data.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalBidVolIdr = finalBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalAskVolIdr = finalAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
         const ringkasAngka = (num) => {
           if (!num || isNaN(num)) return "-";
@@ -398,8 +404,8 @@
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        setBookRows(`${config.key}-bids`, data.bids || [], "bid");
-        setBookRows(`${config.key}-asks`, data.asks || [], "ask");
+        setBookRows(`${config.key}-bids`, finalBids, "bid");
+        setBookRows(`${config.key}-asks`, finalAsks, "ask");
       });
     }
 
