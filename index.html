@@ -177,7 +177,7 @@
         <div class="sim-row">
           <div class="sim-input-wrapper">
             <label for="calc-usdt-size">Ukuran Beli (USDT)</label>
-            <input type="number" id="calc-usdt-size" value="100" min="1" step="50" oninput="calculateSimulatedRates()">
+            <input type="text" id="calc-usdt-size" value="100" oninput="formatNumberInput(this); calculateSimulatedRates();">
           </div>
           <div class="sim-results-wrapper">
             <div class="sim-exchange-result">
@@ -303,7 +303,6 @@
       `;
     }
 
-    // PERBAIKAN UTAMA: Mengisolasi fetcher menggunakan try-catch per komponen agar tidak merusak bursa lain jika terjadi error jala/data.
     async function refreshAll() {
       if (state.inFlight) return;
       state.inFlight = true;
@@ -312,7 +311,6 @@
 
       const tasks = [];
 
-      // Loop pengambil data bursa secara aman
       exchangeConfigs.forEach((config) => {
         tasks.push((async () => {
           try {
@@ -329,7 +327,6 @@
         })());
       });
 
-      // Loop pengambil data kurs BCA secara aman
       tasks.push((async () => {
         try {
           state.bca = await fetchBcaRate();
@@ -339,7 +336,6 @@
         }
       })());
 
-      // Tunggu seluruh tugas independen selesai dieksekusi tanpa saling mematikan
       await Promise.allSettled(tasks);
 
       state.inFlight = false;
@@ -371,45 +367,6 @@
       calculateSimulatedRates();
     }
 
-   function renderExchanges() {
-      exchangeConfigs.forEach((config) => {
-        const data = state.exchanges[config.key];
-        
-        if (!data || data.error) {
-          setText(`${config.key}-total-bid-vol`, "-");
-          setText(`${config.key}-total-ask-vol`, "-");
-          setText(`${config.key}-spread`, "-");
-          
-          const bEl = document.getElementById(`${config.key}-bids`);
-          const aEl = document.getElementById(`${config.key}-asks`);
-          if (bEl) bEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          if (aEl) aEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
-          return;
-        }
-
-        const finalBids = (data.bids || []).slice(0, 10);
-        const finalAsks = (data.asks || []).slice(0, 10);
-
-        // Menghitung volume IDR murni hanya dari 10 baris teratas yang tampil di layar
-        const totalBidVolIdr = finalBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        const totalAskVolIdr = finalAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-
-        const ringkasAngka = (num) => {
-          if (!num || isNaN(num)) return "-";
-          if (num >= 1e9) return (num / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
-          if (num >= 1e6) return (num / 1e6).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " jt";
-          return num.toLocaleString("id-ID");
-        };
-
-        setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
-        setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
-        setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
-        
-        setBookRows(`${config.key}-bids`, finalBids, "bid");
-        setBookRows(`${config.key}-asks`, finalAsks, "ask");
-      });
-    }
-    
     function renderBca() {
       const bca = state.bca;
       const status = getSourceStatus(bca);
@@ -442,7 +399,7 @@
       updateStatusPill(document.querySelector("#source-bca .pill"), bcaStatus.kind, bcaStatus.text);
     }
 
-   async function fetchReku() {
+    async function fetchReku() {
       const response = await fetch("https://api.reku.id/v2/orderbook?symbol=USDT_IDR", {
         cache: "no-store",
         headers: {
@@ -473,7 +430,8 @@
         note: "Reku Pro symbol: USDT_IDR"
       });
     }
-async function fetchTokocrypto() {
+
+    async function fetchTokocrypto() {
       const url = "https://www.tokocrypto.site/api/v3/depth?symbol=USDTIDR&limit=100";
       const payload = await fetchJson(url);
       const data = payload.data || payload;
@@ -484,8 +442,8 @@ async function fetchTokocrypto() {
         sourceUpdatedAt: payload.timestamp ? new Date(Number(payload.timestamp)) : null
       });
     }
+
     async function fetchIndodax() {
-      // Mengambil data order book penuh dari API Indodax lewat proxy
       const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
       const bids = normalizePriceQtySide(book.buy || book.bids || [], "bid");
       const asks = normalizePriceQtySide(book.sell || book.asks || [], "ask");
@@ -496,7 +454,6 @@ async function fetchTokocrypto() {
     }
 
     async function fetchPintu() {
-      // Perbaikan Endpoint & Fallback Struktur Data Pintu Pro agar tidak memicu status Error / No Data
       const payload = await fetchJsonWithCandidates([
         "https://api.pintu.pro/v1/public/get-book?symbol=USDT-IDR&depth=20",
         "https://api.pintupro.com/v1/public/get-book?symbol=USDT-IDR&depth=20"
@@ -598,15 +555,11 @@ async function fetchTokocrypto() {
 
     function finalizeBook(book) {
       if (!book) return { symbol: "-", bids: [], asks: [], bestBid: null, bestAsk: null, spread: null, error: "No data" };
-      
-      // Data tetap dipertahankan mendalam agar simulator matematika berjalan presisi
       const bids = [...(book.bids || [])].sort((a, b) => b.price - a.price);
       const asks = [...(book.asks || [])].sort((a, b) => a.price - b.price);
-      
       const bestBid = bids[0] ? bids[0].price : null; 
       const bestAsk = asks[0] ? asks[0].price : null;
       const spread = (bestBid && bestAsk) ? (bestAsk - bestBid) : null;
-      
       return { ...book, bids, asks, bestBid, bestAsk, spread, error: null };
     }
 
@@ -624,101 +577,22 @@ async function fetchTokocrypto() {
     function getSourceStatus(source, isBca = false) {
       if (!source) return { kind: "delayed", text: "Menunggu" };
       if (source.error) return { kind: "error", text: "Data Eror" };
-      
       const fetchedAgeSeconds = (Date.now() - new Date(source.fetchedAt).getTime()) / 1000;
-      
-      // Logika khusus pemeriksaan jam kerja e-Rate BCA (Senin-Jumat, 08:00 - 16:00 WIB)
       if (isBca) {
-        // Mengonversi waktu saat ini ke zona waktu Asia/Jakarta (WIB)
         const jktDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-        const day = jktDate.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+        const day = jktDate.getDay();
         const hour = jktDate.getHours();
-        
         const isWeekday = day >= 1 && day <= 5;
         const isWorkingHours = hour >= 8 && hour < 16;
-        
         if (isWeekday && isWorkingHours) {
           return { kind: "fresh", text: "BCA Live" };
         } else {
-          // Menggunakan status delayed (kuning) saat bank sudah tutup / libur
           return { kind: "delayed", text: "BCA Tutup" };
         }
       }
-      
       if (fetchedAgeSeconds <= REFRESH_SECONDS + 30) return { kind: "fresh", text: "Live" };
       if (fetchedAgeSeconds <= REFRESH_SECONDS * 2) return { kind: "delayed", text: "Terlambat" };
       return { kind: "error", text: "Kadaluwarsa" };
-    }
-    function formatCountdown(seconds) {
-      const s = Math.max(0, Number(seconds) || 0);
-      return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
-    }
-    function setCycleStatus(kind, text) { updateStatusPill(els.cycleStatus, kind, text); }
-    function updateStatusPill(pill, kind, text) {
-      if (!pill) return;
-      pill.className = `pill ${kind}`;
-      const dot = pill.querySelector(".status-dot");
-      if (dot) dot.className = `status-dot ${kind}`;
-      const label = pill.querySelector("span:last-child");
-      if (label) label.textContent = text;
-    }
-    function latestText(source) { return source && !source.error && source.fetchedAt ? formatTime(source.fetchedAt) : "-"; }
-    function relativeAge(dateValue) {
-      const s = Math.max(0, Math.floor((Date.now() - new Date(dateValue).getTime()) / 1000));
-      if (s < 60) return `${s}s`;
-      return `${Math.floor(s / 60)}m ${s % 60}s`;
-    }
-    function fmtIdr(value) {
-      if (value == null || !isFinite(value)) return "Rp -";
-      return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: Math.abs(value) < 100 ? 2 : 0 }).format(value);
-    }
-    function fmtNumber(value) {
-      if (value == null || !isFinite(value)) return "-";
-      return new Intl.NumberFormat("id-ID", { maximumFractionDigits: value < 1 ? 6 : 2 }).format(value);
-    }
-    function formatDateTime(v) { return new Intl.DateTimeFormat("id-ID", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Jakarta" }).format(new Date(v)); }
-    function formatTime(v) { return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(v)); }
-    
-    function parseLocaleNumber(v) {
-      const t = String(v).trim();
-      if (t.includes(".") && t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
-      if (t.includes(",")) return Number(t.replace(/,/g, ""));
-      return Number(t);
-    }
-    function normalizeSpace(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
-    function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
-
-    // =========================================================================
-    // OPTIMISASI UTILITY FUNCTIONS & THEME SWITCHER (ANTI-LAG)
-    // =========================================================================
-    function initTheme() { 
-      if ((localStorage.getItem("theme") || "light") === "dark") { 
-        document.documentElement.setAttribute("data-theme", "dark"); 
-        updateThemeUI(true); 
-      } 
-    }
-    
-    function toggleTheme() {
-      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-      const nextDark = !isDark;
-      
-      // 1. Eksekusi perubahan warna CSS secara instan ke browser (Mencegah Stuck)
-      document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
-      localStorage.setItem("theme", nextDark ? "dark" : "light");
-      updateThemeUI(nextDark);
-      
-      // 2. Berikan jeda micro-seconds agar animasi UI selesai, lalu jalankan kalkulasi data
-      setTimeout(() => {
-        if (typeof renderExchanges === "function") renderExchanges();
-        if (typeof calculateSimulatedRates === "function") calculateSimulatedRates();
-      }, 10);
-    }
-    
-    function updateThemeUI(isDark) {
-      const icon = document.getElementById("theme-icon");
-      const text = document.getElementById("theme-text");
-      if (icon) icon.textContent = isDark ? "☀️" : "🌙"; 
-      if (text) text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
     }
 
     function formatCountdown(seconds) {
@@ -783,6 +657,35 @@ async function fetchTokocrypto() {
       if (el) el.textContent = text; 
     }
 
+    function initTheme() { 
+      if ((localStorage.getItem("theme") || "light") === "dark") { 
+        document.documentElement.setAttribute("data-theme", "dark"); 
+        updateThemeUI(true); 
+      } 
+    }
+    
+    function toggleTheme() {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const nextDark = !isDark;
+      document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
+      localStorage.setItem("theme", nextDark ? "dark" : "light");
+      updateThemeUI(nextDark);
+      setTimeout(() => {
+        if (typeof renderExchanges === "function") renderExchanges();
+        if (typeof calculateSimulatedRates === "function") calculateSimulatedRates();
+      }, 10);
+    }
+    
+    function updateThemeUI(isDark) {
+      const icon = document.getElementById("theme-icon");
+      const text = document.getElementById("theme-text");
+      if (icon) icon.textContent = isDark ? "☀️" : "🌙"; 
+      if (text) text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
+    }
+
+    // =========================================================================
+    // RENDER UI DASHBOARD: REKU & BURSA LAIN DIKUNCI KETAT HANYA 10 BARIS TERATAS
+    // =========================================================================
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
@@ -799,23 +702,13 @@ async function fetchTokocrypto() {
           return;
         }
 
-        // 1. Ambil data visual 10 baris teratas yang valid dekat dengan harga pasar (Spread)
-        let visualBids = [];
-        let visualAsks = [];
+        // 1. Potong data visual ketat hanya mengambil maksimal 10 baris teratas
+        const finalBids = (data.bids || []).slice(0, 10);
+        const finalAsks = (data.asks || []).slice(0, 10);
 
-        if (config.key === "reku") {
-          visualBids = data.bids || [];
-          visualAsks = data.asks || [];
-        } else {
-          // Mengambil 10 baris teratas dari bids (harga tertinggi ke bawah)
-          visualBids = (data.bids || []).slice(0, 10);
-          // Mengambil 10 baris teratas dari asks (harga terendah ke atas)
-          visualAsks = (data.asks || []).slice(0, 10);
-        }
-
-        // 2. Hitung total volume IDR murni hanya dari 10 data visual teratas tersebut
-        const totalBidVolIdr = visualBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        const totalAskVolIdr = visualAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        // 2. Hitung total volume IDR murni dari 10 baris teratas visual yang baru saja dipotong
+        const totalBidVolIdr = finalBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalAskVolIdr = finalAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
         const ringkasAngka = (num) => {
           if (!num || isNaN(num)) return "-";
@@ -824,26 +717,31 @@ async function fetchTokocrypto() {
           return num.toLocaleString("id-ID");
         };
 
-        // 3. Tampilkan ke UI Dashboard
         setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        setBookRows(`${config.key}-bids`, visualBids, "bid");
-        setBookRows(`${config.key}-asks`, visualAsks, "ask");
+        setBookRows(`${config.key}-bids`, finalBids, "bid");
+        setBookRows(`${config.key}-asks`, finalAsks, "ask");
       });
     }
 
-   // =========================================================================
-    // SIMULATOR TAKER: LOGIKA LAST HIT PRICE & ROUNDING KE ATAS (AUTO-CALCULATE)
-    // =========================================================================
+    function formatNumberInput(input) {
+      let value = input.value.replace(/\D/g, "");
+      if (value === "") {
+        input.value = "";
+        return;
+      }
+      input.value = parseInt(value, 10).toLocaleString("id-ID");
+    }
+    
     function calculateSimulatedRates() {
-      // Mengambil elemen secara presisi dari objek els atau fallback ke DOM jika belum terikat
-      const sizeInput = document.getElementById("calc-usdt-size");
+     const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
-      const targetSize = parseFloat(sizeInput.value) || 0;
       
-      // Sinkronisasi Fee & Pajak Pintu Pro (M: 0.1311% | T: 0.1811%)
+      const cleanValue = sizeInput.value.replace(/\./g, "");
+      const targetSize = parseFloat(cleanValue) || 0;
+      
       const ratesConfig = { 
         indodax: { makerFee: 0.000111, takerFee: 0.001111 }, 
         tokocrypto: { makerFee: 0.001111, takerFee: 0.002111 }, 
@@ -865,7 +763,6 @@ async function fetchTokocrypto() {
           return; 
         }
 
-        // --- 1. MAKER (M) + ROUNDING KE ATAS MURNI ---
         const bestBidPrice = data.bids[0]?.price;
         if (bestBidPrice && !isNaN(bestBidPrice)) {
           const netMakerPrice = bestBidPrice * (1 + config.makerFee);
@@ -874,7 +771,6 @@ async function fetchTokocrypto() {
           mEl.textContent = "Rp -";
         }
 
-        // --- 2. TAKER (T) + LOGIKA DEFINITIF LAST HIT PRICE + ROUNDING KE ATAS MURNI ---
         let remainingSize = targetSize;
         let lastHitPrice = 0;
         
@@ -900,7 +796,6 @@ async function fetchTokocrypto() {
       });
     }
 
-    // Mengunci deteksi ketikan instan (Event Listener) saat dokumen selesai dimuat
     document.addEventListener("DOMContentLoaded", () => {
       const inputEl = document.getElementById("calc-usdt-size");
       if (inputEl) {
@@ -909,6 +804,5 @@ async function fetchTokocrypto() {
       }
     });
   </script>
-  
 </body>
 </html>
