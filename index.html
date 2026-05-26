@@ -793,9 +793,6 @@ async function fetchTokocrypto() {
       if (el) el.textContent = text; 
     }
 
-    // =========================================================================
-    // RENDER UI DASHBOARD: VISUAL DIPOTONG KETAT MAKSIMAL TOP 10 BARIS
-    // =========================================================================
     function renderExchanges() {
       exchangeConfigs.forEach((config) => {
         const data = state.exchanges[config.key];
@@ -812,8 +809,23 @@ async function fetchTokocrypto() {
           return;
         }
 
-        const totalBidVolIdr = (data.bids || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
-        const totalAskVolIdr = (data.asks || []).reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        // 1. Ambil data visual 10 baris teratas yang valid dekat dengan harga pasar (Spread)
+        let visualBids = [];
+        let visualAsks = [];
+
+        if (config.key === "reku") {
+          visualBids = data.bids || [];
+          visualAsks = data.asks || [];
+        } else {
+          // Mengambil 10 baris teratas dari bids (harga tertinggi ke bawah)
+          visualBids = (data.bids || []).slice(0, 10);
+          // Mengambil 10 baris teratas dari asks (harga terendah ke atas)
+          visualAsks = (data.asks || []).slice(0, 10);
+        }
+
+        // 2. Hitung total volume IDR murni hanya dari 10 data visual teratas tersebut
+        const totalBidVolIdr = visualBids.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+        const totalAskVolIdr = visualAsks.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
         const ringkasAngka = (num) => {
           if (!num || isNaN(num)) return "-";
@@ -822,16 +834,13 @@ async function fetchTokocrypto() {
           return num.toLocaleString("id-ID");
         };
 
+        // 3. Tampilkan ke UI Dashboard
         setText(`${config.key}-total-bid-vol`, totalBidVolIdr > 0 ? ringkasAngka(totalBidVolIdr) : "-");
         setText(`${config.key}-total-ask-vol`, totalAskVolIdr > 0 ? ringkasAngka(totalAskVolIdr) : "-");
         setText(`${config.key}-spread`, data.spread != null ? fmtIdr(data.spread) : "-");
         
-        // Memotong tampilan visual tabel agar seragam maksimal 10 baris teratas
-        const finalBids = (data.bids || []).slice(0, 10);
-        const finalAsks = (data.asks || []).slice(0, 10);
-
-        setBookRows(`${config.key}-bids`, finalBids, "bid");
-        setBookRows(`${config.key}-asks`, finalAsks, "ask");
+        setBookRows(`${config.key}-bids`, visualBids, "bid");
+        setBookRows(`${config.key}-asks`, visualAsks, "ask");
       });
     }
 
