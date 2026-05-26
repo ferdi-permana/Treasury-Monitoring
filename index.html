@@ -105,10 +105,34 @@
     #card-pintu { border-top: 4px solid #00a896; }
     .exchange-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
     .exchange-stats { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface-2); border-bottom: 1px solid var(--line); align-items: center; justify-items: center; }
-    .stat { padding: 16px 4px; display: flex; flex-direction: column; gap: 10px !important; align-items: center; justify-content: center; text-align: center; width: 100%;}
     .stat:not(:last-child) { border-right: 1px solid var(--line); }
-    .stat .small { font-size: 12x; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; line-height: 1;white-space: nowrap !important;}
-    .stat strong { font-size: 14px !important; font-weight: 800; color: var(--ink); line-height: 1; display: block;}
+    .stat { 
+      padding: 16px 4px !important; 
+      display: flex !important; 
+      flex-direction: column !important; 
+      gap: 10px !important;
+      align-items: center !important; 
+      justify-content: center !important; 
+      text-align: center !important; 
+      width: 100% !important;
+    }
+    .stat .small { 
+      font-size: 10px !important; 
+      color: var(--muted) !important; 
+      text-transform: uppercase !important; 
+      font-weight: 700 !important; 
+      letter-spacing: 0.02em !important;
+      line-height: 1.1 !important;
+      white-space: nowrap !important;
+      display: block !important;
+    }
+    .stat strong {
+      font-size: 14px !important;
+      font-weight: 800 !important;
+      color: var(--ink) !important;
+      line-height: 1.1 !important;
+      display: block !important;
+    }
     .book-tables { display: flex; flex-direction: column; flex: 1; }
     .book-side { flex: 1; }
     .book-side:first-child { border-bottom: 1px solid var(--line); }
