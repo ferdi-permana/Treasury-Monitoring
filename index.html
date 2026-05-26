@@ -386,7 +386,7 @@
           if (aEl) aEl.innerHTML = `<tr><td colspan="4" style="color:var(--sell); text-align:center;">Gagal Memuat Data</td></tr>`;
           return;
         }
-        
+
         const finalBids = (data.bids || []).slice(0, 10);
         const finalAsks = (data.asks || []).slice(0, 10);
 
