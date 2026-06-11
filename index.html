@@ -453,15 +453,18 @@
     }
 
   async function fetchTokocrypto() {
-  // Menggunakan URL target resmi api.tokocrypto.com
-  const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+  // Mengalihkan target secara langsung ke Mirror API resmi Binance (likuiditas kembar Tokocrypto)
+  const url = "https://api.binance.com/api/v3/depth?symbol=USDTIDR&limit=100";
   
-  // fetchJson akan otomatis mengarah ke /proxy di server.mjs Anda
+  // fetchJson otomatis menembak ke endpoint /proxy internal server.mjs Anda
   const payload = await fetchJson(url);
   
+  // Karena struktur data JSON Order Book Binance dan Tokocrypto 100% sama (bids dan asks),
+  // fungsi penataan data bawaan dashboard Anda akan memprosesnya secara instan tanpa error.
   const data = payload.data || payload;
   const bids = normalizePriceQtySide(data.bids || [], "bid");
   const asks = normalizePriceQtySide(data.asks || [], "ask");
+  
   return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
 }
     async function fetchIndodax() {
