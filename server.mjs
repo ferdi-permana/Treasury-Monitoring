@@ -1,15 +1,12 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
-import crypto from "node:crypto"; // Modul bawaan Node.js untuk membuat signature pasar
 
 const port = Number.parseInt(process.env.PORT || "8000", 10);
 const host = "127.0.0.1";
 const root = resolve(".");
 
-const TOKO_API_KEY = "5a1030FC2b1E4F8ae184BAeBa447ccf9ffK6YOXNtYOeJuAhDuPqDSCx8t3V7Fth";
-const TOKO_SECRET_KEY = "499c73CA81D8AFA886f4D6Dbeb7971C7fFdO8tKI55i6bIMXwfimeSxLwzFIlSKl";
-
+// Mengamankan seluruh bursa lama Anda + menambahkan Binance secara resmi
 const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
@@ -19,7 +16,8 @@ const allowedProxyHosts = new Set([
   "api.pintu.pro",
   "api.pintupro.com",
   "api.uat.pintupro.com",
-  "www.bca.co.id"
+  "www.bca.co.id",
+  "api.binance.com" // <-- JALUR AMAN DISETUJUI
 ]);
 
 const types = {
@@ -71,25 +69,9 @@ async function proxyRequest(url, res) {
     return;
   }
 
-  let target = new URL(targetRaw);
+  const target = new URL(targetRaw);
 
-  // LOGIKA UTAMA: Autentikasi Khusus untuk Request Tokocrypto resmi
-  if (target.hostname === "api.tokocrypto.com") {
-    const timestamp = Date.now();
-    
-    // API Resmi Tokocrypto mewajibkan pengiriman tanda tangan (signature) & timestamp data
-    let queryParams = `symbol=USDTIDR&limit=100&timestamp=${timestamp}`;
-    
-    // Enkripsi tanda tangan menggunakan HMAC SHA256 berbasis Secret Key Anda
-    const signature = crypto
-      .createHmac("sha256", TOKO_SECRET_KEY)
-      .update(queryParams)
-      .digest("hex");
-      
-    // Pasang kembali parameter yang sudah valid secara sistem
-    target = new URL(`https://api.tokocrypto.com/api/v3/depth?${queryParams}&signature=${signature}`);
-  } else if (!allowedProxyHosts.has(target.hostname)) {
-    // Validasi exchange lainnya tetap dibiarkan berjalan normal
+  if (!allowedProxyHosts.has(target.hostname)) {
     res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ error: "Proxy host is not allowed" }));
     return;
@@ -99,13 +81,11 @@ async function proxyRequest(url, res) {
   const timeout = setTimeout(() => controller.abort(), 14000);
 
   try {
-    const response = await fetch(target, {
+    const response = await fetch(target.toString(), {
       signal: controller.signal,
       headers: {
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        // Menyisipkan Kunci API ke dalam Header Request sesuai aturan Tokocrypto
-        "X-MBX-APIKEY": TOKO_API_KEY
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
     
