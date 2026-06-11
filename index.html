@@ -452,25 +452,27 @@
       return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date() });
     }
 
-    async function fetchTokocrypto() {
-  // Menggunakan API resmi Tokocrypto
-  const targetUrl = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+   async function fetchTokocrypto() {
+  // Kita tambahkan timestamp acak (_=...) di ujung URL agar Cloudflare menganggapnya sebagai request unik dari browser asli
+  const randomParam = new Date().getTime();
+  const url = `https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100&_=${randomParam}`;
   
-  // Membungkusnya dengan CORS Proxy publik (allorigins) agar lolos dari blokir Cloudflare
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+  // Menggunakan fetch bawaan browser secara langsung, tanpa proxy server manapun
+  const response = await fetch(url, { 
+    method: "GET",
+    headers: {
+      "Accept": "application/json"
+    }
+  });
   
-  // Ambil data dari proxy
-  const response = await fetch(proxyUrl, { cache: "no-store" });
-  if (!response.ok) throw new Error(`${response.status} dari Proxy Tokocrypto`);
+  if (!response.ok) {
+    throw new Error(`Status ${response.status} dari Tokocrypto`);
+  }
   
-  const wrapper = await response.json();
-  
-  // AllOrigins membungkus data asli di dalam properti .contents berupa string text
-  // Kita perlu mengubah string text tersebut kembali menjadi objek JSON
-  const payload = JSON.parse(wrapper.contents);
+  const payload = await response.json();
   const data = payload.data || payload;
   
-  // Memproses data bids dan asks menggunakan fungsi pembantu bawaan index.html Anda
+  // Memproses data bids dan asks menggunakan fungsi pembantu bawaan dari proyek awal Anda
   const bids = normalizePriceQtySide(data.bids || [], "bid");
   const asks = normalizePriceQtySide(data.asks || [], "ask");
   
