@@ -453,14 +453,19 @@
     }
 
     async function fetchTokocrypto() {
-      const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
-      const payload = await fetchJson(url);
-      const data = payload.data || payload;
-      const bids = normalizePriceQtySide(data.bids || [], "bid");
-      const asks = normalizePriceQtySide(data.asks || [], "ask");
-      return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
-    }
-
+  // Langsung tembak ke API resmi Tokocrypto dari browser
+  const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+  
+  // Gunakan fetch bawaan browser secara langsung, bukan fetchJson() bawaan proxy
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`${response.status} dari Tokocrypto`);
+  
+  const payload = await response.json();
+  const data = payload.data || payload;
+  const bids = normalizePriceQtySide(data.bids || [], "bid");
+  const asks = normalizePriceQtySide(data.asks || [], "ask");
+  return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
+}
     async function fetchIndodax() {
       const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
       const bids = normalizePriceQtySide(book.buy || book.bids || [], "bid");
