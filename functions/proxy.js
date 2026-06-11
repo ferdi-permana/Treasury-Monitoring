@@ -1,5 +1,3 @@
-import puppeteer from "puppeteer-core";
-
 const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
@@ -37,46 +35,59 @@ export async function onRequestGet(context) {
     return jsonResponse({ error: "Proxy host is not allowed" }, 403);
   }
 
+  // ========================================================
+  // JALUR KHUSUS TOKOCRYPTO: Menembak via HTTP API Browserless (Tanpa Modul Puppeteer)
+  // ========================================================
   if (target.hostname === "api.tokocrypto.com" || target.hostname === "www.tokocrypto.site") {
     const BROWSERLESS_TOKEN = "2UgSAmpChJzCm9Sfbc672c6f839acf97057ba6a4d1c104f62";
     
-    let browser = null;
+    // Menggunakan Endpoint Kinerja Tinggi dari Browserless untuk langsung mengambil konten JSON
+    const browserlessUrl = `https://chrome.browserless.io/content?token=${BROWSERLESS_TOKEN}`;
+
     try {
-      // Menyambungkan Cloudflare Pages ke browser eksternal Browserless
-      browser = await puppeteer.connect({
-        browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
+      // Menyuruh Browserless membuka web Tokocrypto dari server mereka
+      const response = await fetch(browserlessUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          url: target.toString(),
+          // Menunggu hingga jaringan tenang (data order book sudah dimuat lengkap)
+          waitUntil: "networkidle0"
+        })
       });
 
-      const page = await browser.newPage();
-      
-      // Menyamarkan diri agar terdeteksi sebagai browser Chrome manusia asli
-      await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+      if (!response.ok) {
+        throw new Error(`Browserless membalas status: ${response.status}`);
+      }
 
-      // Buka API Tokocrypto asli dan tunggu response jaringannya stabil
-      await page.goto(target.toString(), { waitUntil: "networkidle0", timeout: 15000 });
-      
-      // Mengambil text JSON murni yang dirender di layar Chrome gaib
-      const plainText = await page.evaluate(() => document.body.innerText);
-      
+      // Browserless mengembalikan struktur HTML penuh dari halaman target
+      const htmlContent = await response.text();
+
+      // Kita ekstrak teks murni di dalam tag <body> menggunakan regex agar ringan di Cloudflare
+      const bodyMatch = htmlContent.match(/<body>([\s\S]*?)<\/body>/i);
+      let rawText = bodyMatch ? bodyMatch[1].trim() : htmlContent;
+
+      // Bersihkan sisa elemen pre-wrap HTML jika ada di layar browser
+      rawText = rawText.replace(/<[^>]*>/g, "");
+
       let parsedData;
       try {
-        parsedData = JSON.parse(plainText);
+        parsedData = JSON.parse(rawText);
       } catch {
-        parsedData = { error: "Gagal memparsing JSON dari layar browser simulasi", raw: plainText };
+        parsedData = { error: "Gagal memparsing teks layar menjadi JSON asli", raw: rawText };
       }
 
       return jsonResponse(parsedData, 200);
 
     } catch (scrapeError) {
-      return jsonResponse({ error: "Scraping gagal lewat browser simulasi: " + scrapeError.message }, 502);
-    } finally {
-      // Wajib selalu menutup browser agar batas menit gratisan Anda tidak hang/habis
-      if (browser) await browser.close();
+      return jsonResponse({ error: "Bypass Tokocrypto Gagal: " + scrapeError.message }, 502);
     }
   }
 
   // ========================================================
-  // JALUR ORIGINAL: Bursa/Bank lainnya tetap menggunakan fetch bawaan Anda yang super cepat
+  // JALUR ORIGINAL: Bursa/Bank lainnya tetap menggunakan fetch bawaan Anda
   // ========================================================
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 14000);
