@@ -452,29 +452,40 @@
       return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date() });
     }
 
-  async function fetchTokocrypto() {
-  const url = "https://api.coingecko.com/api/v3/exchanges/tokocrypto/tickers?coin_ids=tether";
-  
-  const payload = await fetchJson(url);
 
-  const tickers = payload.tickers || [];
-  const usdtIdrTicker = tickers.find(t => t.base === "USDT" && t.target === "IDR");
-  
-  // Jika data tidak ditemukan, pasang data kosong agar dashboard tidak crash
-  let livePrice = 16000; 
-  if (usdtIdrTicker) {
-    livePrice = usdtIdrTicker.last; // Mengambil harga terakhir (last price) resmi dari Tokocrypto via CoinGecko
+async function fetchJson(targetUrl) {
+ 
+  const response = await fetch(`/proxy?url=${encodeURIComponent(targetUrl)}`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`HTTP Error! Status: ${response.status}`);
   }
-  
-  const simulatedData = {
-    bids: [[String(livePrice), "1000"]],
-    asks: [[String(livePrice + 1), "1000"]]
-  };
-  
-  const bids = normalizePriceQtySide(simulatedData.bids, "bid");
-  const asks = normalizePriceQtySide(simulatedData.asks, "ask");
-  
-  return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
+  return await response.json();
+}
+
+
+async function fetchTokocrypto() {
+  try {
+
+    const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+    
+    // Menjalankan fetch menggunakan jembatan proxy gabungan kita di atas
+    const payload = await fetchJson(url);
+    
+    // Menyesuaikan pembacaan objek data bawaan proyek Anda
+    const data = payload.data || payload;
+    
+    // Memproses data murni menggunakan fungsi pembantu bawaan dashboard awal Anda
+    const bids = normalizePriceQtySide(data.bids || [], "bid");
+    const asks = normalizePriceQtySide(data.asks || [], "ask");
+    
+    // Mengembalikan objek final yang siap dicetak ke layar dashboard
+    return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
+    
+  } catch (error) {
+    console.error("Gagal memuat data pasar Tokocrypto:", error);
+    // Mengembalikan data kosong agar UI dashboard Anda tidak patah/blank di layar
+    return finalizeBook({ symbol: "USDTIDR", bids: [], asks: [], fetchedAt: new Date() });
+  }
 }
     async function fetchIndodax() {
       const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
