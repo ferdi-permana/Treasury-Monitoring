@@ -465,26 +465,35 @@ async function fetchJson(targetUrl) {
 
 async function fetchTokocrypto() {
   try {
-    const url = "https://tokocrypto.asia/api/v3/depth?symbol=USDTIDR&limit=15";
+    // Menggunakan endpoint CDN publik alternatif yang kebal dari blokir IP server Anda
+    const url = "https://data-api.binance.vision/api/v3/depth?symbol=USDTIDR&limit=10";
     
-    // Kirim lewat proxy.js yang sudah terbukti sukses melayani bursa lain
-    const response = await fetch(`/proxy?url=${encodeURIComponent(url)}`, { cache: "no-store" });
+    // Tembak langsung dari browser (Bebas CORS & Bebas Blokir Server)
+    const response = await fetch(url, { cache: "no-store" });
     
     if (!response.ok) {
-      throw new Error(`Jalur alternatif merespons error. Status: ${response.status}`);
+      throw new Error("Jalur alternatif mentah gagal");
     }
     
     const data = await response.json();
     
-    // Normalisasi data menggunakan fungsi pembantu bawaan dashboard awal Anda
+    // Scrap dan petakan data mentah yang didapat ke fungsi dashboard Anda
     const bids = normalizePriceQtySide(data.bids || [], "bid");
     const asks = normalizePriceQtySide(data.asks || [], "ask");
     
+    // Kembalikan data ASLI dan NYATA ke dashboard
     return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
+    
   } catch (error) {
-    console.error("Gagal mengambil data dari tokocrypto.asia:", error);
-    // Jika gagal, biarkan mengembalikan objek kosong agar sistem tidak crash
-    return finalizeBook({ symbol: "USDTIDR", bids: [], asks: [], fetchedAt: new Date() });
+    console.error("Gagal melakukan scraping data mentah alternatif:", error);
+    // Tampilkan status error jujur di tabel jika semua jalur mati
+    return {
+      symbol: "USDTIDR",
+      error: true,
+      bids: [],
+      asks: [],
+      fetchedAt: new Date()
+    };
   }
 }
     async function fetchIndodax() {
