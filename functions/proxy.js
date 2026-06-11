@@ -63,23 +63,22 @@ export async function onRequestGet(context) {
       }
 
       // Browserless mengembalikan struktur HTML penuh dari halaman target
-      const htmlContent = await response.text();
+const htmlContent = await response.text();
 
-      // Kita ekstrak teks murni di dalam tag <body> menggunakan regex agar ringan di Cloudflare
-      const bodyMatch = htmlContent.match(/<body>([\s\S]*?)<\/body>/i);
-      let rawText = bodyMatch ? bodyMatch[1].trim() : htmlContent;
+// Menggunakan let agar variabelnya sah untuk diubah-ubah nilainya
+let rawText = htmlContent.trim();
 
-      // Bersihkan sisa elemen pre-wrap HTML jika ada di layar browser
-      rawText = rawText.replace(/<[^>]*>/g, "");
+// Bersihkan sisa elemen pre-wrap HTML jika ada di layar browser
+rawText = rawText.replace(/<[^>]*>/g, "");
 
-      let parsedData;
-      try {
-        parsedData = JSON.parse(rawText);
-      } catch {
-        parsedData = { error: "Gagal memparsing teks layar menjadi JSON asli", raw: rawText };
-      }
+let parsedData;
+try {
+  parsedData = JSON.parse(rawText);
+} catch {
+  parsedData = { error: "Gagal memparsing teks layar menjadi JSON asli", raw: rawText };
+}
 
-      return jsonResponse(parsedData, 200);
+return jsonResponse(parsedData, 200);
 
     } catch (scrapeError) {
       return jsonResponse({ error: "Bypass Tokocrypto Gagal: " + scrapeError.message }, 502);
