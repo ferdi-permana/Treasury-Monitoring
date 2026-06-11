@@ -452,61 +452,17 @@
       return finalizeBook({ symbol: "USDT_IDR", bids, asks, fetchedAt: new Date() });
     }
 
-  // Deklarasikan variabel global di luar fungsi agar data bisa diakses kapan saja
-let tokocryptoOrderBook = { bids: [], asks: [], fetchedAt: new Date() };
-
-function hubungkanWebSocketTokocrypto() {
-  // Menggunakan stream WebSocket resmi dari jaringan Tokocrypto/Binance
-  // @depth100@100ms artinya meminta data 100 kedalaman bid/ask dengan update setiap 100 milidetik
-  const wsUrl = "wss://stream.tokocrypto.com/ws/usdtidr@depth100@100ms";
-  const ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    console.log("Terhubung ke WebSocket Tokocrypto dengan sukses!");
-  };
-
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      
-      // Memproses data bids dan asks menggunakan fungsi pembantu bawaan dari proyek Anda
-      const bids = normalizePriceQtySide(data.bids || [], "bid");
-      const asks = normalizePriceQtySide(data.asks || [], "ask");
-      
-      // Simpan hasil pemrosesan ke variabel global
-      tokocryptoOrderBook = finalizeBook({ 
-        symbol: "USDTIDR", 
-        bids, 
-        asks, 
-        fetchedAt: new Date() 
-      });
-      
-      // SINKRONISASI: Jika di index.html Anda ada fungsi untuk merender/menampilkan data ke UI, 
-      // panggil fungsinya di sini agar layar otomatis terupdate. Contoh:
-      // perbaruiTampilanUI(tokocryptoOrderBook);
-
-    } catch (err) {
-      console.error("Gagal memproses data WebSocket:", err);
-    }
-  };
-
-  ws.onerror = (error) => {
-    console.error("WebSocket mengalami error:", error);
-  };
-
-  ws.onclose = () => {
-    console.log("Koneksi terputus. Mencoba menghubungkan kembali dalam 5 detik...");
-    setTimeout(hubungkanWebSocketTokocrypto, 5000); // Otomatis reconnect jika internet putus
-  };
-}
-
-// Cukup panggil fungsi ini SATU KALI saja saat aplikasi pertama kali dimuat
-// Contoh: dimasukkan ke dalam document.addEventListener("DOMContentLoaded", ...)
-hubungkanWebSocketTokocrypto();
-
-// Sekarang, fungsi fetchTokocrypto() lama Anda cukup mengembalikan nilai dari variabel global saja
-async function fetchTokocrypto() {
-  return tokocryptoOrderBook;
+  async function fetchTokocrypto() {
+  // Menggunakan URL target resmi api.tokocrypto.com
+  const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+  
+  // fetchJson akan otomatis mengarah ke /proxy di server.mjs Anda
+  const payload = await fetchJson(url);
+  
+  const data = payload.data || payload;
+  const bids = normalizePriceQtySide(data.bids || [], "bid");
+  const asks = normalizePriceQtySide(data.asks || [], "ask");
+  return finalizeBook({ symbol: "USDTIDR", bids, asks, fetchedAt: new Date() });
 }
     async function fetchIndodax() {
       const book = await fetchJsonWithCandidates(["https://indodax.com/api/depth/usdtidr", "https://indodax.com/api/depth/usdt_idr"]);
