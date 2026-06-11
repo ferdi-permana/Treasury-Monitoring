@@ -453,7 +453,7 @@
     }
 
     async function fetchTokocrypto() {
-      const url = "https://www.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
+      const url = "https://api.tokocrypto.com/api/v3/depth?symbol=USDTIDR&limit=100";
       const payload = await fetchJson(url);
       const data = payload.data || payload;
       const bids = normalizePriceQtySide(data.bids || [], "bid");
