@@ -6,7 +6,7 @@ const port = Number.parseInt(process.env.PORT || "8000", 10);
 const host = "127.0.0.1";
 const root = resolve(".");
 
-// Mengamankan seluruh bursa lama Anda + menambahkan Binance secara resmi
+// Menambahkan CoinGecko ke dalam whitelist host proxy Anda
 const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
@@ -17,8 +17,8 @@ const allowedProxyHosts = new Set([
   "api.pintupro.com",
   "api.uat.pintupro.com",
   "www.bca.co.id",
-  "api.binance.com" // <-- JALUR AMAN DISETUJUI
-]);
+  "api.binance.com",
+  "api.coingecko.com"
 
 const types = {
   ".html": "text/html; charset=utf-8",
