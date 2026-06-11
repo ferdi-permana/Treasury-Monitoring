@@ -1,4 +1,5 @@
 const allowedProxyHosts = new Set([
+  "tokocrypto.asia",
   "api.reku.id",
   "www.tokocrypto.site",
   "cloudme-toko.2meta.app",
