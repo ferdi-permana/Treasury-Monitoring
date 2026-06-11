@@ -1,12 +1,14 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
+import puppeteer from "puppeteer-core"; // Menggunakan core yang super ringan untuk Cloudflare
 
 const port = Number.parseInt(process.env.PORT || "8000", 10);
 const host = "127.0.0.1";
 const root = resolve(".");
 
-// Menambahkan CoinGecko ke dalam whitelist host proxy Anda
+const BROWSERLESS_TOKEN = "2UgSAmpChJzCm9Sfbc672c6f839acf97057ba6a4d1c104f62";
+
 const allowedProxyHosts = new Set([
   "api.reku.id",
   "www.tokocrypto.site",
@@ -16,9 +18,8 @@ const allowedProxyHosts = new Set([
   "api.pintu.pro",
   "api.pintupro.com",
   "api.uat.pintupro.com",
-  "www.bca.co.id",
-  "api.binance.com",
-  "api.coingecko.com"
+  "www.bca.co.id"
+]);
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -71,24 +72,53 @@ async function proxyRequest(url, res) {
 
   const target = new URL(targetRaw);
 
+  // MENGGOCEKK TOKOCRYPTO VIA REMOTE BROWSERLESS DI CLOUDFLARE PAGES
+  if (target.hostname === "api.tokocrypto.com" || target.hostname === "www.tokocrypto.site") {
+    let browser = null;
+    try {
+      // Menyambungkan server Cloudflare Pages Anda ke browser gaib di cloud Browserless
+      browser = await puppeteer.connect({
+        browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+      // Menembak endpoint asli Tokocrypto
+      await page.goto(target.toString(), { waitUntil: "networkidle0", timeout: 15000 });
+      const plainText = await page.evaluate(() => document.body.innerText);
+
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*"
+      });
+      res.end(plainText);
+      return;
+
+    } catch (scrapeError) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Cloudflare Pages gagal scrape: " + scrapeError.message }));
+      return;
+    } finally {
+      if (browser) await browser.close();
+    }
+  }
+
+  // JALUR BURSA LAIN: Tetap menggunakan fetch biasa bawaan Cloudflare Pages yang super cepat
   if (!allowedProxyHosts.has(target.hostname)) {
     res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ error: "Proxy host is not allowed" }));
     return;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 14000);
-
   try {
     const response = await fetch(target.toString(), {
-      signal: controller.signal,
       headers: {
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
       }
     });
-    
     const body = await response.text();
     res.writeHead(response.status, {
       "Content-Type": response.headers.get("content-type") || "application/json; charset=utf-8",
@@ -98,8 +128,6 @@ async function proxyRequest(url, res) {
     res.end(body);
   } catch (error) {
     res.writeHead(502, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: error.name === "AbortError" ? "Proxy timeout" : "Upstream fetch failed" }));
-  } finally {
-    clearTimeout(timeout);
+    res.end(JSON.stringify({ error: "Upstream fetch failed" }));
   }
 }
