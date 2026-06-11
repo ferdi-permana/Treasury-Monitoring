@@ -120,4 +120,6 @@ async function proxyRequest(url, res) {
     res.writeHead(502, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: error.name === "AbortError" ? "Proxy timeout" : "Upstream fetch failed" }));
   } finally {
-    clearTimeout(
+    clearTimeout(timeout);
+  }
+}
