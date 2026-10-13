@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>USDT/IDR Live Order Book</title>
+  <title>USDT/IDR Live Order Book & Simulator</title>
   
   <link rel="icon" type="image/png" href="logo.png">
 
@@ -22,8 +22,6 @@
       --warn: #b7791f;
       --warn-bg: #fff7e6;
       --info: #2f6f9f;
-      --info-bg: #e8f3fb;
-      --bad-bg: #fff0f0;
       --shadow: 0 16px 40px rgba(23, 37, 51, 0.08);
       --radius: 8px;
       color-scheme: light;
@@ -43,9 +41,7 @@
       --sell: #f85149;
       --sell-bg: #2d1f20;
       --warn: #f1e05a;
-      --warn-bg: #2d2a1f;
       --info: #58a6ff;
-      --info-bg: #1f2835;
       color-scheme: dark;
     }
 
@@ -81,13 +77,18 @@
     .bca-rate-number.trend-buy { color: var(--buy); }
     .bca-rate-number.trend-sell { color: var(--sell); }
     .meta { font-size: 11px; color: var(--muted); }
-    .sim-header { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .sim-header { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    
+    .sim-mode-toggle { display: inline-flex; background: var(--surface-2); border-radius: 6px; border: 1px solid var(--line); padding: 2px; }
+    .sim-mode-btn { border: none; background: transparent; padding: 4px 12px; font-size: 11px; font-weight: 700; border-radius: 4px; cursor: pointer; color: var(--muted); min-height: 28px; }
+    .sim-mode-btn.active-buy { background: var(--buy); color: #ffffff; }
+    .sim-mode-btn.active-sell { background: var(--sell); color: #ffffff; }
+
     .sim-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 100%; }
     .sim-controls { display: flex; flex-direction: column; gap: 10px; flex: 0 0 180px; }
     .sim-input-wrapper { display: flex; flex-direction: column; gap: 4px; }
     .sim-input-wrapper label { font-size: 11px; color: var(--muted); font-weight: 500; }
     .sim-input-wrapper input, .sim-input-wrapper select { width: 100%; min-height: 36px; font-weight: 700; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); text-align: center; }
-    .sim-input-wrapper select { text-align-last: center; font-weight: 600; }
     .sim-results-wrapper { display: flex; gap: 12px; flex: 1; justify-content: flex-end; }
     .sim-exchange-result { background: var(--surface-2); border-radius: 6px; padding: 10px 14px; min-width: 175px; display: flex; flex-direction: column; gap: 4px; }
     .sim-select-wrapper { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--line); }
@@ -214,11 +215,17 @@
       </div>
 
       <div class="simulator-panel">
-        <div class="sim-header">Simulasi Beli USDT (Harga Bersih)</div>
+        <div class="sim-header">
+          <span id="sim-title-label">Simulasi Beli USDT (Total Biaya Dikeluarkan)</span>
+          <div class="sim-mode-toggle">
+            <button type="button" class="sim-mode-btn active-buy" id="btn-mode-buy" onclick="setSimMode('buy')">Beli</button>
+            <button type="button" class="sim-mode-btn" id="btn-mode-sell" onclick="setSimMode('sell')">Jual</button>
+          </div>
+        </div>
         <div class="sim-row">
           <div class="sim-controls">
             <div class="sim-input-wrapper">
-              <label for="calc-usdt-size">Ukuran Beli (USDT)</label>
+              <label for="calc-usdt-size" id="sim-input-label">Ukuran Beli (USDT)</label>
               <input type="text" id="calc-usdt-size" value="100" oninput="formatNumberInput(this); calculateSimulatedRates();">
             </div>
           </div>
@@ -282,23 +289,51 @@
   <script>
     const REFRESH_SECONDS = 300;
     const REQUEST_TIMEOUT_MS = 14000;
+
+    let currentSimMode = 'buy';
     
-    const IndodaxLevel = {
-      regular: { makerFee: 0.0010555, takerFee: 0.0020555 },
-      vip:     { makerFee: 0.0000555, takerFee: 0.0010555 }
+    // Fee Structure Beli (BUY)
+    const FeesBuy = {
+      reku: { makerFee: 0.0010555, takerFee: 0.0010555 },
+      pintu: { makerFee: 0.0012555, takerFee: 0.0017555 },
+      indodax: {
+        regular: { makerFee: 0.0010555, takerFee: 0.0020555 },
+        vip:     { makerFee: 0.0000555, takerFee: 0.0010555 }
+      },
+      tokocrypto: {
+        regular: { makerFee: 0.001222, takerFee: 0.002222 },
+        vip1:    { makerFee: 0.001197, takerFee: 0.002166 },
+        vip2:    { makerFee: 0.001172, takerFee: 0.002122 },
+        vip3:    { makerFee: 0.001122, takerFee: 0.002022 },
+        vip4:    { makerFee: 0.001022, takerFee: 0.001822 },
+        vip5:    { makerFee: 0.000922, takerFee: 0.001622 },
+        vip6:    { makerFee: 0.000722, takerFee: 0.001242 },
+        vip7:    { makerFee: 0.000682, takerFee: 0.001172 },
+        vip8:    { makerFee: 0.000642, takerFee: 0.001122 },
+        vip9:    { makerFee: 0.000582, takerFee: 0.001002 }
+      }
     };
 
-    const TokocryptoLevel = {
-      regular: { makerFee: 0.001222, takerFee: 0.002222 },
-      vip1:    { makerFee: 0.001197, takerFee: 0.002166 },
-      vip2:    { makerFee: 0.001172, takerFee: 0.002122 },
-      vip3:    { makerFee: 0.001122, takerFee: 0.002022 },
-      vip4:    { makerFee: 0.001022, takerFee: 0.001822 },
-      vip5:    { makerFee: 0.000922, takerFee: 0.001622 },
-      vip6:    { makerFee: 0.000722, takerFee: 0.001242 },
-      vip7:    { makerFee: 0.000682, takerFee: 0.001172 },
-      vip8:    { makerFee: 0.000642, takerFee: 0.001122 },
-      vip9:    { makerFee: 0.000582, takerFee: 0.001002 }
+    // Fee Structure Jual (SELL)
+    const FeesSell = {
+      reku: { makerFee: 0.0031555, takerFee: 0.0031555 },
+      pintu: { makerFee: 0.0033555, takerFee: 0.0038555 },
+      indodax: {
+        regular: { makerFee: 0.0031555, takerFee: 0.0041555 },
+        vip:     { makerFee: 0.0021555, takerFee: 0.0031555 }
+      },
+      tokocrypto: {
+        regular: { makerFee: 0.003322, takerFee: 0.004322 },
+        vip1:    { makerFee: 0.003297, takerFee: 0.004266 },
+        vip2:    { makerFee: 0.003272, takerFee: 0.004222 },
+        vip3:    { makerFee: 0.003222, takerFee: 0.004122 },
+        vip4:    { makerFee: 0.003122, takerFee: 0.003922 },
+        vip5:    { makerFee: 0.003022, takerFee: 0.003722 },
+        vip6:    { makerFee: 0.002822, takerFee: 0.003342 },
+        vip7:    { makerFee: 0.002782, takerFee: 0.003272 },
+        vip8:    { makerFee: 0.002742, takerFee: 0.003222 },
+        vip9:    { makerFee: 0.002682, takerFee: 0.003102 }
+      }
     };
 
     const state = {
@@ -337,6 +372,28 @@
       startCountdown();
     }
 
+    function setSimMode(mode) {
+      currentSimMode = mode;
+      const btnBuy = document.getElementById("btn-mode-buy");
+      const btnSell = document.getElementById("btn-mode-sell");
+      const labelInput = document.getElementById("sim-input-label");
+      const labelTitle = document.getElementById("sim-title-label");
+
+      if (mode === 'buy') {
+        btnBuy.className = "sim-mode-btn active-buy";
+        btnSell.className = "sim-mode-btn";
+        labelInput.textContent = "Ukuran Beli (USDT)";
+        labelTitle.textContent = "Simulasi Beli USDT (Total Biaya Dikeluarkan)";
+      } else {
+        btnBuy.className = "sim-mode-btn";
+        btnSell.className = "sim-mode-btn active-sell";
+        labelInput.textContent = "Ukuran Jual (USDT)";
+        labelTitle.textContent = "Simulasi Jual USDT (Hasil Bersih Diterima)";
+      }
+
+      calculateSimulatedRates();
+    }
+
     function formatNumberInput(input) {
       let value = input.value.replace(/\D/g, "");
       if (value === "") { input.value = ""; return; }
@@ -345,6 +402,11 @@
 
     function bindEvents() {
       els.refreshButton.addEventListener("click", refreshAll);
+      
+      const lvlIndodax = document.getElementById("lvl-indodax");
+      const lvlToko = document.getElementById("lvl-tokocrypto");
+      if (lvlIndodax) lvlIndodax.addEventListener("change", calculateSimulatedRates);
+      if (lvlToko) lvlToko.addEventListener("change", calculateSimulatedRates);
     }
 
     function renderShell() {
@@ -688,7 +750,7 @@
     }
     function updateThemeUI(isDark) {
       const icon = document.getElementById("theme-icon"); const text = document.getElementById("theme-text");
-      if (icon) icon.textContent = isDark ? "☀️" : "🌙"; if (text) text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
+      if (icon) icon.textContent = isDark ? "☀" : "🌙"; if (text) text.textContent = isDark ? "Mode Terang" : "Mode Gelap"; 
     }
 
     function renderExchanges() {
@@ -728,6 +790,7 @@
       });
     }
 
+    // SIMULATOR MAKER & TAKER (VWAP) DENGAN STRICT ROUNDING
     function calculateSimulatedRates() {
       const sizeInput = document.getElementById("calc-usdt-size");
       if (!sizeInput) return;
@@ -735,51 +798,135 @@
       const cleanValue = sizeInput.value.replace(/\./g, "");
       const targetSize = parseFloat(cleanValue) || 0;
 
-      const selectedIndodaxLvl = document.getElementById("lvl-indodax")?.value || "regular";
-      const selectedTokocryptoLvl = document.getElementById("lvl-tokocrypto")?.value || "regular";
+      const selectedIndodaxLvl = document.getElementById("lvl-indodax") ? document.getElementById("lvl-indodax").value : "regular";
+      const selectedTokocryptoLvl = document.getElementById("lvl-tokocrypto") ? document.getElementById("lvl-tokocrypto").value : "regular";
+
+      const activeFeeStructure = currentSimMode === 'buy' ? FeesBuy : FeesSell;
 
       const ratesConfig = { 
-        reku: { makerFee: 0.0010555, takerFee: 0.0010555 },
-        indodax: IndodaxLevel[selectedIndodaxLvl], 
-        tokocrypto: TokocryptoLevel[selectedTokocryptoLvl], 
-        pintu: { makerFee: 0.0012555, takerFee: 0.0017555 } 
+        reku: activeFeeStructure.reku,
+        indodax: activeFeeStructure.indodax[selectedIndodaxLvl] || activeFeeStructure.indodax.regular, 
+        tokocrypto: activeFeeStructure.tokocrypto[selectedTokocryptoLvl] || activeFeeStructure.tokocrypto.regular, 
+        pintu: activeFeeStructure.pintu 
+      };
+
+      // Rules Pembulatan: Beli = Round Up (Math.ceil), Jual = Round Floor (Math.floor)
+      const processRounding = (val) => {
+        if (!val || isNaN(val)) return "Rp -";
+        let rounded = 0;
+        if (currentSimMode === 'buy') {
+          const safeVal = val - 1e-9;
+          rounded = Math.ceil(safeVal);
+        } else {
+          const safeVal = val + 1e-9;
+          rounded = Math.floor(safeVal);
+        }
+        return "Rp " + rounded.toLocaleString("id-ID");
       };
 
       Object.keys(ratesConfig).forEach((key) => {
-        const data = state.exchanges[key]; const config = ratesConfig[key];
-        const mEl = document.getElementById(`rate-m-${key}`); const tEl = document.getElementById(`rate-t-${key}`);
+        const data = state.exchanges[key]; 
+        const config = ratesConfig[key];
+        const mEl = document.getElementById(`rate-m-${key}`); 
+        const tEl = document.getElementById(`rate-t-${key}`);
         if (!mEl || !tEl) return;
         
-        if (!data || data.error || !Array.isArray(data.bids) || !data.bids.length || !Array.isArray(data.asks) || !data.asks.length || targetSize <= 0 || !config) { 
-          mEl.textContent = "Rp -"; tEl.textContent = "Rp -"; return; 
+        if (!data || data.error || targetSize <= 0 || !config) { 
+          mEl.textContent = "Rp -"; 
+          tEl.textContent = "Rp -"; 
+          return; 
         }
 
-        const bestBidPrice = data.bids[0]?.price;
-        if (bestBidPrice && !isNaN(bestBidPrice)) {
-          mEl.textContent = "Rp " + Math.ceil(bestBidPrice * (1 + config.makerFee)).toLocaleString("id-ID");
-        } else { mEl.textContent = "Rp -"; }
+        if (currentSimMode === 'buy') {
+          // --- MODE BELI (ROUND UP / MATH.CEIL) ---
+          
+          // 1. MAKER BUY: Best Bid * (1 + Maker Fee Beli)
+          const bestBidPrice = data.bids && data.bids[0] ? data.bids[0].price : null;
+          if (bestBidPrice && !isNaN(bestBidPrice)) {
+            const exactMakerPrice = bestBidPrice * (1 + config.makerFee);
+            mEl.textContent = processRounding(exactMakerPrice);
+          } else {
+            mEl.textContent = "Rp -";
+          }
 
-        let remainingSize = targetSize; let lastHitPrice = 0;
-        for (const order of data.asks) {
-          const price = Number(order.price || 0); const qty = Number(order.qty || 0);
-          if (price <= 0 || qty <= 0) continue;
-          lastHitPrice = price; remainingSize -= qty;
-          if (remainingSize <= 0) break;
+          // 2. TAKER BUY: VWAP dari Orderbook Asks * (1 + Taker Fee Beli)
+          let remainingSize = targetSize;
+          let totalCostIdr = 0;
+          let totalFilledQty = 0;
+
+          const sortedAsks = Array.isArray(data.asks) ? [...data.asks].sort((a, b) => a.price - b.price) : [];
+
+          if (sortedAsks.length > 0) {
+            for (const order of sortedAsks) {
+              const price = Number(order.price || 0);
+              const qty = Number(order.qty || 0);
+              if (price <= 0 || qty <= 0) continue;
+
+              const fillQty = Math.min(remainingSize, qty);
+              totalCostIdr += fillQty * price;
+              totalFilledQty += fillQty;
+              remainingSize -= fillQty;
+
+              if (remainingSize <= 1e-8) break;
+            }
+
+            if (totalFilledQty > 0) {
+              const vwapPrice = totalCostIdr / totalFilledQty;
+              const exactTakerPrice = vwapPrice * (1 + config.takerFee);
+              tEl.textContent = processRounding(exactTakerPrice);
+            } else {
+              tEl.textContent = "Rp -";
+            }
+          } else {
+            tEl.textContent = "Rp -";
+          }
+
+        } else {
+          // --- MODE JUAL (ROUND FLOOR / MATH.FLOOR) ---
+          
+          // 1. MAKER SELL: Best Ask * (1 - Maker Fee Jual)
+          const bestAskPrice = data.asks && data.asks[0] ? data.asks[0].price : null;
+          if (bestAskPrice && !isNaN(bestAskPrice)) {
+            const exactMakerPrice = bestAskPrice * (1 - config.makerFee);
+            mEl.textContent = processRounding(exactMakerPrice);
+          } else {
+            mEl.textContent = "Rp -";
+          }
+
+          // 2. TAKER SELL: VWAP dari Orderbook Bids * (1 - Taker Fee Jual)
+          let remainingSize = targetSize;
+          let totalRevenueIdr = 0;
+          let totalFilledQty = 0;
+
+          const sortedBids = Array.isArray(data.bids) ? [...data.bids].sort((a, b) => b.price - a.price) : [];
+
+          if (sortedBids.length > 0) {
+            for (const order of sortedBids) {
+              const price = Number(order.price || 0);
+              const qty = Number(order.qty || 0);
+              if (price <= 0 || qty <= 0) continue;
+
+              const fillQty = Math.min(remainingSize, qty);
+              totalRevenueIdr += fillQty * price;
+              totalFilledQty += fillQty;
+              remainingSize -= fillQty;
+
+              if (remainingSize <= 1e-8) break;
+            }
+
+            if (totalFilledQty > 0) {
+              const vwapPrice = totalRevenueIdr / totalFilledQty;
+              const exactTakerPrice = vwapPrice * (1 - config.takerFee);
+              tEl.textContent = processRounding(exactTakerPrice);
+            } else {
+              tEl.textContent = "Rp -";
+            }
+          } else {
+            tEl.textContent = "Rp -";
+          }
         }
-        
-        if (lastHitPrice > 0 && !isNaN(lastHitPrice) && isFinite(lastHitPrice)) {
-          tEl.textContent = "Rp " + Math.ceil(lastHitPrice * (1 + config.takerFee)).toLocaleString("id-ID");
-        } else { tEl.textContent = "Rp -"; }
       });
     }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const inputEl = document.getElementById("calc-usdt-size");
-      if (inputEl) {
-        inputEl.addEventListener("input", calculateSimulatedRates);
-        inputEl.addEventListener("change", calculateSimulatedRates);
-      }
-    });
   </script>
 </body>
 </html>
