@@ -5,5 +5,5 @@ compatibility_date = "2024-01-01"
 crons = ["*/1 * * * *"]
 
 [[kv_namespaces]]
-binding = "ORDERBOOK_KV"
-id = "52a36524a03b4bfdb2a8ab4cdd482eb6"
+binding = "Orderbook_KV"
+id = "c89ba75f0a9143dfb83eb5391246b81d"
