@@ -803,7 +803,7 @@
           const item = new ClipboardItem({ "image/png": blob });
           await navigator.clipboard.write([item]);
 
-          btn.textContent = "✅ Gambar Tersalin!";
+          btn.textContent = "✅ Done Screenshot!";
           setTimeout(() => {
             btn.textContent = originalText;
             btn.disabled = false;
